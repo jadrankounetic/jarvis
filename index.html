@@ -800,11 +800,19 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     if (!text || !text.trim()) return;
     state.speaking = true; setState('speaking'); updateMic();
     try {
-      if (state.elevenKey) await speakEleven(text);
-      else await speakWeb(text, lang);
+      if (state.elevenKey) {
+        try {
+          await speakEleven(text);
+        } catch (e) {
+          // Surface the actual ElevenLabs error so user can see why it fell back
+          addMessage('error', `ElevenLabs: ${e.message} — falling back to system voice.`);
+          try { await speakWeb(text, lang); } catch {}
+        }
+      } else {
+        await speakWeb(text, lang);
+      }
     } catch (e) {
-      console.warn('Voice failed, falling back', e);
-      try { await speakWeb(text, lang); } catch {}
+      console.warn('Voice failed', e);
     } finally {
       state.speaking = false; setState('idle'); updateMic();
     }
