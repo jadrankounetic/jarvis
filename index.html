@@ -40,11 +40,9 @@
     position: relative;
   }
 
-  /* Scanline + grid background */
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background-image:
       linear-gradient(rgba(77, 214, 255, 0.04) 1px, transparent 1px),
       linear-gradient(90deg, rgba(77, 214, 255, 0.04) 1px, transparent 1px);
@@ -54,8 +52,7 @@
   }
   body::after {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background:
       radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,3,8,0.7) 80%),
       repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(77,214,255,0.025) 2px, rgba(77,214,255,0.025) 3px);
@@ -64,199 +61,111 @@
   }
 
   .app {
-    position: relative;
-    z-index: 2;
+    position: relative; z-index: 2;
     height: 100dvh;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
-  /* Top bar */
   .topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
     padding: 14px 18px 10px;
     border-bottom: 1px solid var(--border);
     font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.25em;
+    font-size: 11px; letter-spacing: 0.25em;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--cyan-bright);
-    font-weight: 700;
-  }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--cyan-bright); font-weight: 700; }
   .brand-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
+    width: 8px; height: 8px; border-radius: 50%;
     background: var(--cyan);
     box-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan);
     animation: pulse-dot 2s ease-in-out infinite;
   }
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .topbar-right {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-  }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .topbar-right { display: flex; gap: 14px; align-items: center; }
   .icon-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--cyan);
-    width: 32px; height: 32px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    transition: all 0.2s;
-    font-family: inherit;
-    font-size: 14px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--cyan); width: 32px; height: 32px;
+    border-radius: 4px; cursor: pointer;
+    display: grid; place-items: center;
+    transition: all 0.2s; font-family: inherit; font-size: 14px;
   }
   .icon-btn:hover, .icon-btn:active {
     background: rgba(77, 214, 255, 0.1);
-    border-color: var(--cyan);
-    color: var(--cyan-bright);
+    border-color: var(--cyan); color: var(--cyan-bright);
   }
 
-  /* Status line under topbar */
   .status-line {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 18px;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+    padding: 8px 18px; font-size: 10px; letter-spacing: 0.2em;
+    color: var(--text-dim); border-bottom: 1px solid var(--border);
     text-transform: uppercase;
   }
   .status-line span { color: var(--cyan); }
 
-  /* Main area */
   .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    min-height: 0;
-    padding: 10px 16px;
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    position: relative; min-height: 0; padding: 10px 16px 0;
   }
 
-  /* Orb / reactor core */
   .reactor-wrap {
-    position: relative;
-    width: min(280px, 60vw);
-    aspect-ratio: 1;
-    display: grid;
-    place-items: center;
-    margin: 10px 0;
-    flex-shrink: 0;
+    position: relative; width: min(220px, 50vw);
+    aspect-ratio: 1; display: grid; place-items: center;
+    margin: 6px 0 4px; flex-shrink: 0;
   }
-
-  .ring {
-    position: absolute;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    pointer-events: none;
-  }
+  .ring { position: absolute; border-radius: 50%; border: 1px solid var(--border); pointer-events: none; }
   .ring-1 { inset: 0; border-color: var(--border-strong); }
   .ring-2 { inset: 12%; border-style: dashed; animation: rotate-cw 24s linear infinite; }
   .ring-3 { inset: 24%; border-color: var(--cyan); border-top-color: transparent; border-left-color: transparent; animation: rotate-ccw 8s linear infinite; }
-
   @keyframes rotate-cw { to { transform: rotate(360deg); } }
   @keyframes rotate-ccw { to { transform: rotate(-360deg); } }
 
   .core {
-    position: absolute;
-    inset: 32%;
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 35% 30%, var(--cyan-bright), var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
-    box-shadow:
-      0 0 40px var(--cyan),
-      0 0 80px rgba(77, 214, 255, 0.5),
-      inset 0 0 30px rgba(255, 255, 255, 0.3);
+    position: absolute; inset: 32%; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--cyan-bright), var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
+    box-shadow: 0 0 40px var(--cyan), 0 0 80px rgba(77, 214, 255, 0.5), inset 0 0 30px rgba(255, 255, 255, 0.3);
     animation: breathe 3s ease-in-out infinite;
   }
   @keyframes breathe {
     0%, 100% { transform: scale(1); opacity: 0.9; }
     50% { transform: scale(1.05); opacity: 1; }
   }
-
-  /* State variants */
   .reactor-wrap[data-state="listening"] .core {
     animation: pulse-listen 0.6s ease-in-out infinite;
     background: radial-gradient(circle at 35% 30%, #ffffff, var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
   }
-  @keyframes pulse-listen {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.15); }
-  }
+  @keyframes pulse-listen { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
   .reactor-wrap[data-state="listening"] .ring-2 { animation-duration: 6s; }
   .reactor-wrap[data-state="listening"] .ring-3 { animation-duration: 2s; border-color: var(--cyan-bright); }
-
   .reactor-wrap[data-state="thinking"] .core {
     background: radial-gradient(circle at 35% 30%, var(--gold), #ff8c00 30%, #663300 60%, transparent 75%);
     box-shadow: 0 0 40px var(--gold), 0 0 80px rgba(255, 181, 71, 0.5);
     animation: spin-think 2s linear infinite;
   }
-  @keyframes spin-think {
-    0% { transform: rotate(0); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .reactor-wrap[data-state="speaking"] .core {
-    animation: speak-pulse 0.4s ease-in-out infinite;
-  }
-  @keyframes speak-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.08); }
-  }
-
+  @keyframes spin-think { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+  .reactor-wrap[data-state="speaking"] .core { animation: speak-pulse 0.4s ease-in-out infinite; }
+  @keyframes speak-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
   .reactor-wrap[data-state="error"] .core {
     background: radial-gradient(circle at 35% 30%, #ffaaaa, var(--red) 30%, #660000 60%, transparent 75%);
     box-shadow: 0 0 40px var(--red), 0 0 80px rgba(255, 77, 77, 0.5);
   }
 
-  /* HUD corners */
-  .corner {
-    position: absolute;
-    width: 18px; height: 18px;
-    border: 2px solid var(--cyan);
-  }
+  .corner { position: absolute; width: 18px; height: 18px; border: 2px solid var(--cyan); }
   .corner-tl { top: -4px; left: -4px; border-right: none; border-bottom: none; }
   .corner-tr { top: -4px; right: -4px; border-left: none; border-bottom: none; }
   .corner-bl { bottom: -4px; left: -4px; border-right: none; border-top: none; }
   .corner-br { bottom: -4px; right: -4px; border-left: none; border-top: none; }
 
-  /* State label */
   .state-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.4em;
-    color: var(--cyan);
-    text-transform: uppercase;
-    margin: 14px 0 6px;
-    min-height: 18px;
-    text-shadow: 0 0 10px var(--cyan);
+    font-family: 'Orbitron', sans-serif; font-size: 11px;
+    letter-spacing: 0.4em; color: var(--cyan); text-transform: uppercase;
+    margin: 6px 0 4px; min-height: 16px; text-shadow: 0 0 10px var(--cyan);
   }
 
-  /* Transcript area */
   .transcript {
-    width: 100%;
-    max-width: 600px;
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 4px 12px;
-    margin-top: 6px;
+    width: 100%; max-width: 600px; flex: 1; overflow-y: auto;
+    padding: 8px 4px 12px; margin-top: 6px;
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
   }
@@ -264,58 +173,78 @@
   .transcript::-webkit-scrollbar-track { background: transparent; }
   .transcript::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  .msg {
-    margin-bottom: 14px;
-    font-size: 13px;
-    line-height: 1.5;
-    animation: fade-in 0.3s ease-out;
-  }
+  .msg { margin-bottom: 14px; font-size: 13px; line-height: 1.5; animation: fade-in 0.3s ease-out; }
   @keyframes fade-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .msg-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 9px;
-    letter-spacing: 0.3em;
-    color: var(--cyan);
-    margin-bottom: 4px;
+    font-family: 'Orbitron', sans-serif; font-size: 9px;
+    letter-spacing: 0.3em; color: var(--cyan); margin-bottom: 4px;
   }
   .msg-user .msg-label { color: var(--gold); }
   .msg-error .msg-label { color: var(--red); }
   .msg-error .msg-text { color: #ff9999; }
-  .msg-text {
-    color: var(--text);
-    padding-left: 10px;
-    border-left: 1px solid var(--border);
-  }
+  .msg-text { color: var(--text); padding-left: 10px; border-left: 1px solid var(--border); }
   .msg-user .msg-text { border-left-color: rgba(255, 181, 71, 0.4); }
   .msg-interim .msg-text { color: var(--text-dim); font-style: italic; }
 
-  /* Mic button */
+  .card {
+    margin: 8px 0 0 10px; border: 1px solid var(--border);
+    background: rgba(77, 214, 255, 0.04);
+    overflow: hidden; position: relative;
+    animation: fade-in 0.3s ease-out;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    font-family: 'Orbitron', sans-serif; font-size: 9px;
+    letter-spacing: 0.3em; color: var(--cyan); text-transform: uppercase;
+  }
+  .card-header-icon { font-size: 12px; }
+  .card-map iframe {
+    width: 100%; height: 220px; border: 0; display: block;
+  }
+  .card-link {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px; cursor: pointer; transition: background 0.2s;
+    text-decoration: none; color: inherit;
+  }
+  .card-link:hover, .card-link:active { background: rgba(77, 214, 255, 0.1); }
+  .card-link-icon {
+    width: 38px; height: 38px; flex-shrink: 0;
+    border: 1px solid var(--cyan); border-radius: 4px;
+    display: grid; place-items: center; font-size: 18px;
+    color: var(--cyan-bright);
+  }
+  .card-link-content { flex: 1; min-width: 0; }
+  .card-link-title {
+    font-size: 13px; color: var(--cyan-bright);
+    font-weight: 500; margin-bottom: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-link-desc {
+    font-size: 11px; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-link-arrow { color: var(--cyan); font-size: 16px; }
+  .card-youtube { background: rgba(255, 77, 77, 0.04); }
+  .card-youtube .card-header { color: #ff8888; }
+  .card-youtube .card-link-icon { border-color: #ff8888; color: #ffaaaa; }
+
   .mic-area {
     padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
     border-top: 1px solid var(--border);
   }
   .mic-btn {
-    position: relative;
-    width: 84px;
-    height: 84px;
-    border-radius: 50%;
-    border: 2px solid var(--cyan);
+    position: relative; width: 84px; height: 84px;
+    border-radius: 50%; border: 2px solid var(--cyan);
     background: radial-gradient(circle, rgba(77,214,255,0.2), rgba(77,214,255,0.05));
-    color: var(--cyan-bright);
-    font-size: 32px;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    transition: all 0.2s;
-    font-family: inherit;
-    box-shadow: 0 0 20px rgba(77, 214, 255, 0.3);
+    color: var(--cyan-bright); font-size: 32px; cursor: pointer;
+    display: grid; place-items: center; transition: all 0.2s;
+    font-family: inherit; box-shadow: 0 0 20px rgba(77, 214, 255, 0.3);
   }
   .mic-btn:active { transform: scale(0.95); }
   .mic-btn[data-active="true"] {
@@ -328,110 +257,68 @@
     0%, 100% { box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(77, 214, 255, 0.5); }
     50% { box-shadow: 0 0 50px var(--cyan), 0 0 90px rgba(77, 214, 255, 0.8); }
   }
-  .mic-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    animation: none;
-  }
-  .mic-hint {
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-  }
+  .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
+  .mic-hint { font-size: 10px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
 
-  /* Settings modal */
   .modal-backdrop {
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background: rgba(0, 3, 8, 0.85);
     backdrop-filter: blur(6px);
-    z-index: 100;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    z-index: 100; display: none;
+    align-items: center; justify-content: center; padding: 20px;
   }
   .modal-backdrop[data-open="true"] { display: flex; }
   .modal {
-    background: var(--bg);
-    border: 1px solid var(--cyan);
+    background: var(--bg); border: 1px solid var(--cyan);
     box-shadow: 0 0 40px rgba(77, 214, 255, 0.3);
-    width: 100%;
-    max-width: 440px;
-    max-height: 90vh;
-    overflow-y: auto;
-    padding: 24px;
-    position: relative;
+    width: 100%; max-width: 440px; max-height: 90vh;
+    overflow-y: auto; padding: 24px; position: relative;
   }
   .modal::before, .modal::after {
-    content: '';
-    position: absolute;
-    width: 14px; height: 14px;
-    border: 2px solid var(--cyan);
+    content: ''; position: absolute;
+    width: 14px; height: 14px; border: 2px solid var(--cyan);
   }
   .modal::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
   .modal::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
   .modal h2 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
-    letter-spacing: 0.3em;
-    color: var(--cyan-bright);
-    margin-bottom: 18px;
-    text-transform: uppercase;
+    font-family: 'Orbitron', sans-serif; font-size: 14px;
+    letter-spacing: 0.3em; color: var(--cyan-bright);
+    margin-bottom: 18px; text-transform: uppercase;
+  }
+  .modal h3 {
+    font-family: 'Orbitron', sans-serif; font-size: 10px;
+    letter-spacing: 0.25em; color: var(--gold);
+    margin: 18px 0 10px; padding-top: 14px;
+    text-transform: uppercase; border-top: 1px solid var(--border);
   }
   .field { margin-bottom: 16px; }
   .field label {
-    display: block;
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-bottom: 6px;
+    display: block; font-size: 10px; letter-spacing: 0.2em;
+    color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px;
   }
   .field input, .field select {
     width: 100%;
     background: rgba(77, 214, 255, 0.05);
-    border: 1px solid var(--border);
-    color: var(--text);
+    border: 1px solid var(--border); color: var(--text);
     padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.2s;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    outline: none; transition: border-color 0.2s;
   }
   .field input:focus, .field select:focus { border-color: var(--cyan); }
-  .field-hint {
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 4px;
-    line-height: 1.5;
-  }
+  .field-hint { font-size: 10px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; }
   .field-hint a { color: var(--cyan); }
 
-  .btn-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-  }
+  .btn-row { display: flex; gap: 10px; margin-top: 20px; }
   .btn {
-    flex: 1;
-    padding: 12px;
-    background: transparent;
-    border: 1px solid var(--cyan);
-    color: var(--cyan);
-    font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    cursor: pointer;
+    flex: 1; padding: 12px;
+    background: transparent; border: 1px solid var(--cyan);
+    color: var(--cyan); font-family: 'Orbitron', sans-serif;
+    font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; cursor: pointer;
     transition: all 0.2s;
   }
-  .btn:hover, .btn:active {
-    background: var(--cyan);
-    color: #000;
-  }
+  .btn:hover, .btn:active { background: var(--cyan); color: #000; }
   .btn-secondary { border-color: var(--border); color: var(--text-dim); }
   .btn-danger { border-color: var(--red); color: var(--red); }
   .btn-danger:hover { background: var(--red); color: #000; }
@@ -440,20 +327,14 @@
     padding: 10px 12px;
     border: 1px solid rgba(255, 181, 71, 0.4);
     background: rgba(255, 181, 71, 0.05);
-    color: var(--gold);
-    font-size: 11px;
-    line-height: 1.5;
-    margin-bottom: 16px;
+    color: var(--gold); font-size: 11px;
+    line-height: 1.5; margin-bottom: 16px;
   }
 
-  /* Empty transcript hint */
   .empty-hint {
-    text-align: center;
-    color: var(--text-dim);
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 20px;
+    text-align: center; color: var(--text-dim);
+    font-size: 11px; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 20px;
   }
 </style>
 </head>
@@ -473,7 +354,7 @@
 
   <div class="status-line">
     <div>SYS <span id="sysStatus">ONLINE</span></div>
-    <div>LANG <span id="langStatus">--</span></div>
+    <div>VOICE <span id="voiceStatus">--</span></div>
     <div>MODEL <span id="modelStatus">--</span></div>
   </div>
 
@@ -500,17 +381,16 @@
   </div>
 </div>
 
-<!-- Settings modal -->
 <div class="modal-backdrop" id="settingsModal">
   <div class="modal">
     <h2>System Configuration</h2>
 
     <div class="warning">
-      ⚠ Your API key is stored only on this device. For personal use only — for a production app, route requests through a backend.
+      ⚠ API ključevi se spremaju samo na ovom uređaju. Nemoj dijeliti URL ako si spremio ključ.
     </div>
 
     <div class="field">
-      <label>Anthropic API Key</label>
+      <label>Anthropic API Key (required)</label>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
       <div class="field-hint">Get one at <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a></div>
     </div>
@@ -538,10 +418,30 @@
       </select>
     </div>
 
+    <h3>Voice (Movie-grade)</h3>
+
     <div class="field">
-      <label>Voice Pitch</label>
+      <label>ElevenLabs API Key (optional)</label>
+      <input type="password" id="elevenKeyInput" placeholder="sk_... (leave empty for system voice)">
+      <div class="field-hint">Free 10k chars/month at <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">elevenlabs.io</a> — gives you a real movie-quality JARVIS voice. Supports Croatian.</div>
+    </div>
+
+    <div class="field">
+      <label>JARVIS Voice (ElevenLabs)</label>
+      <select id="elevenVoiceSelect">
+        <option value="JBFqnCBsd6RMkjVDRZzb">George — deep British (most JARVIS-like)</option>
+        <option value="onwK4e9ZLuTAKqWW03F9">Daniel — authoritative British</option>
+        <option value="N2lVS1w4EtoT3dr4eOWO">Callum — intense British</option>
+        <option value="cgSgspJ2msm6clMCkdW9">Jessica — refined female</option>
+        <option value="pNInz6obpgDQGcFmaJgB">Adam — American male</option>
+      </select>
+      <div class="field-hint">Used only when ElevenLabs key is set.</div>
+    </div>
+
+    <div class="field">
+      <label>System Voice Pitch (fallback)</label>
       <input type="range" id="pitchSlider" min="0.5" max="1.5" step="0.05" value="0.85">
-      <div class="field-hint">Lower = deeper voice</div>
+      <div class="field-hint">Used only when no ElevenLabs key. Lower = deeper.</div>
     </div>
 
     <div class="btn-row">
@@ -556,32 +456,77 @@
 
 <script>
 (() => {
-  // ------------ Config & state ------------
   const API_URL = 'https://api.anthropic.com/v1/messages';
   const ANTHROPIC_VERSION = '2023-06-01';
+  const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
-  const SYSTEM_PROMPT = `You are J.A.R.V.I.S. — Just A Rather Very Intelligent System — a personal AI assistant inspired by the one from Iron Man.
+  const SYSTEM_PROMPT = `You are J.A.R.V.I.S. — Just A Rather Very Intelligent System — a personal AI assistant inspired by Iron Man's JARVIS.
 
 Personality:
-- Sophisticated, articulate, with subtle dry wit.
-- Loyal, efficient, never sycophantic. Slightly British in tone if speaking English.
-- Address the user respectfully — "sir" in English, "gospodine" in Croatian, "señor" in Spanish, etc. Use sparingly, not in every reply.
+- Sophisticated, articulate, dry wit. Slightly British in English.
+- Loyal, efficient, never sycophantic.
+- Address the user respectfully — "sir" in English, "gospodine" in Croatian, "señor" in Spanish — sparingly.
 
 Response style — VERY IMPORTANT, your replies are spoken aloud:
-- Be concise. One to three sentences for most answers. Longer only when the user explicitly asks for detail.
-- Plain prose only. No markdown, no asterisks, no bullet points, no headers, no code fences.
-- Avoid emoji.
+- Be concise. One to three sentences for most answers.
+- Plain prose only. No markdown, no asterisks, no bullets, no headers, no code fences. No emoji.
 - Spell out abbreviations when ambiguous in speech.
-- If you genuinely don't know, say so briefly.
+- If you don't know, say so briefly.
 
 Language:
 - Detect the user's language from their message and reply in the same language.
-- For Croatian/Bosnian/Serbian, write naturally as a native speaker would.
+- Croatian/Bosnian/Serbian: write naturally as a native speaker would.
 
-You are speaking through a phone. Keep it natural, like a trusted advisor on call.`;
+Visual tools — three tools available:
+- show_map — when the user asks about places, locations, directions, routes, or wants to see somewhere
+- show_youtube — when the user wants to watch, listen to, or find a video, song, or clip
+- show_link — when directing the user to a specific webpage
+
+When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Plotting the route now.") and THEN call the tool. Don't describe what's on the map/video — the user will see it. Don't read out URLs aloud.`;
+
+  const TOOLS = [
+    {
+      name: 'show_map',
+      description: 'Display a Google Maps view embedded in the conversation. Use for any place, location, address, or directions request.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Place name or search (e.g. "Eiffel Tower, Paris"). Use when no directions are needed.' },
+          origin: { type: 'string', description: 'Starting point for directions (optional).' },
+          destination: { type: 'string', description: 'Destination for directions (optional, used with origin).' }
+        }
+      }
+    },
+    {
+      name: 'show_youtube',
+      description: 'Display a YouTube card. Use when the user wants to watch a video, listen to music, or find a clip.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query or specific title (e.g. "Iron Man trailer", "Bohemian Rhapsody Queen")' }
+        },
+        required: ['query']
+      }
+    },
+    {
+      name: 'show_link',
+      description: 'Display a tappable link card. Use when directing the user to a webpage.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Full URL including https://' },
+          title: { type: 'string', description: 'Short display title (max ~40 chars)' },
+          description: { type: 'string', description: 'Optional one-line description' }
+        },
+        required: ['url', 'title']
+      }
+    }
+  ];
 
   const state = {
     apiKey: localStorage.getItem('jarvis_api_key') || '',
+    elevenKey: localStorage.getItem('jarvis_eleven_key') || '',
+    elevenVoice: localStorage.getItem('jarvis_eleven_voice') || 'JBFqnCBsd6RMkjVDRZzb',
     lang: localStorage.getItem('jarvis_lang') || 'auto',
     model: localStorage.getItem('jarvis_model') || 'claude-sonnet-4-6',
     pitch: parseFloat(localStorage.getItem('jarvis_pitch') || '0.85'),
@@ -593,34 +538,26 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
     currentLang: 'en-US',
   };
 
-  // ------------ DOM refs ------------
   const $ = (id) => document.getElementById(id);
   const reactor = $('reactor');
   const stateLabel = $('stateLabel');
   const transcript = $('transcript');
-  const emptyHint = $('emptyHint');
   const micBtn = $('micBtn');
   const micHint = $('micHint');
   const sysStatus = $('sysStatus');
-  const langStatus = $('langStatus');
+  const voiceStatus = $('voiceStatus');
   const modelStatus = $('modelStatus');
 
-  // ------------ UI helpers ------------
+  const emptyHint = () => $('emptyHint');
+
   function setState(s) {
     reactor.dataset.state = s;
-    const labels = {
-      idle: 'STANDBY',
-      listening: 'LISTENING',
-      thinking: 'PROCESSING',
-      speaking: 'RESPONDING',
-      error: 'ERROR',
-    };
+    const labels = { idle: 'STANDBY', listening: 'LISTENING', thinking: 'PROCESSING', speaking: 'RESPONDING', error: 'ERROR' };
     stateLabel.textContent = labels[s] || s.toUpperCase();
   }
 
   function updateMic() {
-    const active = state.recognizing;
-    micBtn.dataset.active = active ? 'true' : 'false';
+    micBtn.dataset.active = state.recognizing ? 'true' : 'false';
     micBtn.disabled = state.processing || state.speaking;
     if (state.processing) micHint.textContent = 'Thinking...';
     else if (state.speaking) micHint.textContent = 'Speaking...';
@@ -629,10 +566,9 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
   }
 
   function addMessage(role, text, opts = {}) {
-    if (emptyHint) emptyHint.remove();
+    const eh = emptyHint(); if (eh) eh.remove();
     const div = document.createElement('div');
     div.className = `msg msg-${role}` + (opts.interim ? ' msg-interim' : '');
-    if (opts.id) div.id = opts.id;
     div.innerHTML = `
       <div class="msg-label">${role === 'user' ? '> YOU' : role === 'error' ? '! ERROR' : 'J.A.R.V.I.S.'}</div>
       <div class="msg-text"></div>`;
@@ -647,7 +583,81 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
     transcript.scrollTop = transcript.scrollHeight;
   }
 
-  // ------------ Speech recognition ------------
+  function renderMapCard(input) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    let src;
+    if (input.origin && input.destination) {
+      const o = encodeURIComponent(input.origin);
+      const d = encodeURIComponent(input.destination);
+      src = `https://maps.google.com/maps?saddr=${o}&daddr=${d}&output=embed`;
+    } else {
+      const q = encodeURIComponent(input.query || input.destination || input.origin || '');
+      src = `https://maps.google.com/maps?q=${q}&output=embed`;
+    }
+    const card = document.createElement('div');
+    card.className = 'card card-map';
+    card.innerHTML = `
+      <div class="card-header"><span class="card-header-icon">⌖</span> MAP</div>
+      <iframe src="${src}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function renderYouTubeCard(input) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const q = input.query || '';
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    const card = document.createElement('div');
+    card.className = 'card card-youtube';
+    card.innerHTML = `
+      <div class="card-header"><span class="card-header-icon">▶</span> YOUTUBE</div>
+      <a class="card-link" href="${url}" target="_blank" rel="noopener">
+        <div class="card-link-icon">▶</div>
+        <div class="card-link-content">
+          <div class="card-link-title"></div>
+          <div class="card-link-desc">Tap to open in YouTube</div>
+        </div>
+        <div class="card-link-arrow">›</div>
+      </a>`;
+    card.querySelector('.card-link-title').textContent = q;
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function renderLinkCard(input) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-header"><span class="card-header-icon">⎘</span> LINK</div>
+      <a class="card-link" href="${input.url}" target="_blank" rel="noopener">
+        <div class="card-link-icon">→</div>
+        <div class="card-link-content">
+          <div class="card-link-title"></div>
+          <div class="card-link-desc"></div>
+        </div>
+        <div class="card-link-arrow">›</div>
+      </a>`;
+    card.querySelector('.card-link-title').textContent = input.title || input.url;
+    card.querySelector('.card-link-desc').textContent = input.description || input.url;
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function executeTool(toolUse) {
+    try {
+      switch (toolUse.name) {
+        case 'show_map':     renderMapCard(toolUse.input);     return 'Map displayed to user.';
+        case 'show_youtube': renderYouTubeCard(toolUse.input); return 'YouTube card displayed to user.';
+        case 'show_link':    renderLinkCard(toolUse.input);    return 'Link card displayed to user.';
+        default: return 'Unknown tool.';
+      }
+    } catch (e) {
+      console.error('Tool error', e);
+      return `Tool error: ${e.message}`;
+    }
+  }
+
   function initRecognition() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
@@ -668,23 +678,18 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
 
     if (!state.recognition) state.recognition = initRecognition();
     if (!state.recognition) {
-      addMessage('error', 'Speech recognition not available in this browser. Use Chrome on Android.');
+      addMessage('error', 'Speech recognition not available. Use Chrome on Android.');
       return;
     }
 
     const r = state.recognition;
     const lang = state.lang === 'auto' ? state.currentLang : state.lang;
     r.lang = lang;
-    langStatus.textContent = lang.split('-')[0].toUpperCase();
 
     let interimEl = null;
     let finalText = '';
 
-    r.onstart = () => {
-      state.recognizing = true;
-      setState('listening');
-      updateMic();
-    };
+    r.onstart = () => { state.recognizing = true; setState('listening'); updateMic(); };
     r.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -699,28 +704,19 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
     };
     r.onerror = (e) => {
       state.recognizing = false;
-      if (e.error === 'no-speech' || e.error === 'aborted') {
-        setState('idle');
-      } else {
-        addMessage('error', `Mic error: ${e.error}`);
-        setState('error');
-        setTimeout(() => setState('idle'), 1500);
-      }
+      if (e.error === 'no-speech' || e.error === 'aborted') setState('idle');
+      else { addMessage('error', `Mic error: ${e.error}`); setState('error'); setTimeout(() => setState('idle'), 1500); }
       updateMic();
     };
     r.onend = () => {
       state.recognizing = false;
       if (interimEl) interimEl.remove();
-      if (finalText.trim()) {
-        handleUserMessage(finalText.trim(), lang);
-      } else {
-        setState('idle');
-      }
+      if (finalText.trim()) handleUserMessage(finalText.trim(), lang);
+      else setState('idle');
       updateMic();
     };
 
-    try { r.start(); }
-    catch (err) { console.error(err); }
+    try { r.start(); } catch (err) { console.error(err); }
   }
 
   function stopListening() {
@@ -729,87 +725,148 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
     }
   }
 
-  // ------------ Claude API ------------
   async function callClaude(userText) {
     state.history.push({ role: 'user', content: userText });
+    const collectedText = [];
+    let safety = 0;
 
-    const body = {
-      model: state.model,
-      max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      messages: state.history.slice(-20), // last 10 turns
-    };
+    while (safety++ < 5) {
+      const body = {
+        model: state.model,
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        tools: TOOLS,
+        messages: trimHistory(state.history),
+      };
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': state.apiKey,
-        'anthropic-version': ANTHROPIC_VERSION,
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-    });
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': state.apiKey,
+          'anthropic-version': ANTHROPIC_VERSION,
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify(body),
+      });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      let msg = `HTTP ${res.status}`;
-      try { msg = JSON.parse(errText).error?.message || msg; } catch {}
-      throw new Error(msg);
+      if (!res.ok) {
+        const errText = await res.text();
+        let msg = `HTTP ${res.status}`;
+        try { msg = JSON.parse(errText).error?.message || msg; } catch {}
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      state.history.push({ role: 'assistant', content: data.content });
+
+      const toolResults = [];
+      for (const block of data.content) {
+        if (block.type === 'text' && block.text.trim()) {
+          collectedText.push(block.text);
+          addMessage('assistant', block.text);
+        } else if (block.type === 'tool_use') {
+          const result = executeTool(block);
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result });
+        }
+      }
+
+      if (data.stop_reason !== 'tool_use') break;
+      state.history.push({ role: 'user', content: toolResults });
     }
 
-    const data = await res.json();
-    const text = data.content?.map(c => c.text || '').join('').trim() || '';
-    state.history.push({ role: 'assistant', content: text });
-    localStorage.setItem('jarvis_history', JSON.stringify(state.history.slice(-40)));
-    return text;
+    persistHistory();
+    return collectedText.join(' ').trim();
   }
 
-  // ------------ Text-to-speech ------------
-  function speak(text, lang) {
+  function trimHistory(hist) {
+    if (hist.length <= 24) return hist;
+    let start = hist.length - 24;
+    while (start < hist.length) {
+      const m = hist[start];
+      const isToolResult = Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result');
+      if (m.role === 'user' && !isToolResult) break;
+      start++;
+    }
+    return hist.slice(start);
+  }
+
+  function persistHistory() {
+    const slim = state.history.slice(-40);
+    try { localStorage.setItem('jarvis_history', JSON.stringify(slim)); } catch {}
+  }
+
+  async function speak(text, lang) {
+    if (!text || !text.trim()) return;
+    state.speaking = true; setState('speaking'); updateMic();
+    try {
+      if (state.elevenKey) await speakEleven(text);
+      else await speakWeb(text, lang);
+    } catch (e) {
+      console.warn('Voice failed, falling back', e);
+      try { await speakWeb(text, lang); } catch {}
+    } finally {
+      state.speaking = false; setState('idle'); updateMic();
+    }
+  }
+
+  async function speakEleven(text) {
+    const res = await fetch(`${ELEVEN_API}/${state.elevenVoice}?output_format=mp3_44100_128`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': state.elevenKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`ElevenLabs ${res.status}: ${err.slice(0, 120)}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+      audio.play().catch(reject);
+    });
+  }
+
+  function speakWeb(text, lang) {
     return new Promise((resolve) => {
       if (!('speechSynthesis' in window)) { resolve(); return; }
-
-      // Cancel any existing speech
       window.speechSynthesis.cancel();
-
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = lang;
-      u.rate = 1.0;
-      u.pitch = state.pitch;
-      u.volume = 1.0;
-
-      // Pick the best available voice for this language
+      u.lang = lang || 'en-US';
+      u.rate = 1.0; u.pitch = state.pitch; u.volume = 1.0;
       const voices = window.speechSynthesis.getVoices();
-      const langPrefix = lang.split('-')[0];
+      const langPrefix = u.lang.split('-')[0];
       const candidates = voices.filter(v => v.lang.startsWith(langPrefix));
-      // Prefer male / Google / non-novelty voices
       const pick =
+        candidates.find(v => /uk|gb|british/i.test(v.name + v.lang) && /male/i.test(v.name)) ||
         candidates.find(v => /male/i.test(v.name) && !/female/i.test(v.name)) ||
         candidates.find(v => /Google/i.test(v.name)) ||
         candidates[0];
       if (pick) u.voice = pick;
-
-      u.onstart = () => { state.speaking = true; setState('speaking'); updateMic(); };
-      u.onend = () => { state.speaking = false; setState('idle'); updateMic(); resolve(); };
-      u.onerror = () => { state.speaking = false; setState('idle'); updateMic(); resolve(); };
-
+      u.onend = resolve; u.onerror = resolve;
       window.speechSynthesis.speak(u);
     });
   }
 
-  // ------------ Main flow ------------
   async function handleUserMessage(text, lang) {
     addMessage('user', text);
-    state.processing = true;
-    setState('thinking');
-    updateMic();
-
+    state.processing = true; setState('thinking'); updateMic();
     try {
       const reply = await callClaude(text);
       state.processing = false;
-      addMessage('assistant', reply);
-      await speak(reply, lang);
+      if (reply) await speak(reply, lang);
+      else { setState('idle'); updateMic(); }
     } catch (err) {
       state.processing = false;
       addMessage('error', err.message);
@@ -819,9 +876,10 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
     }
   }
 
-  // ------------ Settings ------------
   function openSettings() {
     $('apiKeyInput').value = state.apiKey;
+    $('elevenKeyInput').value = state.elevenKey;
+    $('elevenVoiceSelect').value = state.elevenVoice;
     $('langSelect').value = state.lang;
     $('modelSelect').value = state.model;
     $('pitchSlider').value = state.pitch;
@@ -831,11 +889,15 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
 
   function saveSettings() {
     state.apiKey = $('apiKeyInput').value.trim();
+    state.elevenKey = $('elevenKeyInput').value.trim();
+    state.elevenVoice = $('elevenVoiceSelect').value;
     state.lang = $('langSelect').value;
     state.model = $('modelSelect').value;
     state.pitch = parseFloat($('pitchSlider').value);
 
     localStorage.setItem('jarvis_api_key', state.apiKey);
+    localStorage.setItem('jarvis_eleven_key', state.elevenKey);
+    localStorage.setItem('jarvis_eleven_voice', state.elevenVoice);
     localStorage.setItem('jarvis_lang', state.lang);
     localStorage.setItem('jarvis_model', state.model);
     localStorage.setItem('jarvis_pitch', String(state.pitch));
@@ -845,12 +907,9 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
   }
 
   function resetAll() {
-    if (!confirm('Erase API key, conversation, and all settings?')) return;
-    localStorage.removeItem('jarvis_api_key');
-    localStorage.removeItem('jarvis_lang');
-    localStorage.removeItem('jarvis_model');
-    localStorage.removeItem('jarvis_pitch');
-    localStorage.removeItem('jarvis_history');
+    if (!confirm('Erase API keys, conversation, and all settings?')) return;
+    ['jarvis_api_key', 'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_model', 'jarvis_pitch', 'jarvis_history']
+      .forEach(k => localStorage.removeItem(k));
     location.reload();
   }
 
@@ -863,7 +922,8 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
   }
 
   function refreshStatusBar() {
-    langStatus.textContent = state.lang === 'auto' ? 'AUTO' : state.lang.split('-')[0].toUpperCase();
+    voiceStatus.textContent = state.elevenKey ? 'ELEVEN' : 'SYSTEM';
+    voiceStatus.style.color = state.elevenKey ? 'var(--gold)' : '';
     const m = state.model;
     modelStatus.textContent = m.includes('opus') ? 'OPUS' : m.includes('sonnet') ? 'SONNET' : m.includes('haiku') ? 'HAIKU' : 'CUSTOM';
     sysStatus.textContent = state.apiKey ? 'ONLINE' : 'NO KEY';
@@ -872,43 +932,37 @@ You are speaking through a phone. Keep it natural, like a trusted advisor on cal
 
   function rehydrateHistory() {
     if (!state.history.length) return;
-    if (emptyHint) emptyHint.remove();
-    state.history.forEach(m => {
-      addMessage(m.role === 'user' ? 'user' : 'assistant', m.content);
-    });
+    const eh = emptyHint(); if (eh) eh.remove();
+    for (const m of state.history) {
+      if (typeof m.content === 'string') {
+        addMessage(m.role === 'user' ? 'user' : 'assistant', m.content);
+      } else if (Array.isArray(m.content)) {
+        for (const b of m.content) {
+          if (b.type === 'text' && b.text) addMessage(m.role === 'user' ? 'user' : 'assistant', b.text);
+          else if (b.type === 'tool_use') executeTool(b);
+        }
+      }
+    }
   }
 
-  // ------------ Wire up ------------
-  micBtn.addEventListener('click', () => {
-    if (state.recognizing) stopListening();
-    else startListening();
-  });
+  micBtn.addEventListener('click', () => state.recognizing ? stopListening() : startListening());
   $('settingsBtn').addEventListener('click', openSettings);
   $('clearBtn').addEventListener('click', clearHistory);
   $('saveSettings').addEventListener('click', saveSettings);
   $('closeSettings').addEventListener('click', closeSettings);
   $('resetAll').addEventListener('click', resetAll);
 
-  // Trigger voice list load (some browsers are lazy)
   if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
   }
 
-  // Initial setup
   refreshStatusBar();
   rehydrateHistory();
   setState('idle');
 
-  // Prompt for API key on first launch
-  if (!state.apiKey) {
-    setTimeout(() => openSettings(), 400);
-  }
-
-  // Detect browser language for auto mode
-  if (state.lang === 'auto' && navigator.language) {
-    state.currentLang = navigator.language;
-  }
+  if (!state.apiKey) setTimeout(openSettings, 400);
+  if (state.lang === 'auto' && navigator.language) state.currentLang = navigator.language;
 })();
 </script>
 </body>
