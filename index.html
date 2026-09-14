@@ -565,13 +565,12 @@
       <div class="field">
         <label>Model</label>
         <select id="groqModel">
-          <option value="llama-3.3-70b-versatile" selected>Llama 3.3 70B — general purpose</option>
-          <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant — fastest</option>
+          <option value="openai/gpt-oss-120b" selected>GPT-OSS 120B — strong reasoning (replaces Llama 3.3 70B)</option>
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B — fastest (replaces Llama 3.1 8B)</option>
           <option value="qwen/qwen3.6-27b">Qwen 3.6 27B — reasoning + vision</option>
-          <option value="qwen-2.5-coder-32b">Qwen 2.5 Coder 32B — code specialist</option>
-          <option value="openai/gpt-oss-120b">GPT-OSS 120B — strong reasoning</option>
-          <option value="openai/gpt-oss-20b">GPT-OSS 20B — compact</option>
+          <option value="groq/compound">Groq Compound — agentic (web search + code)</option>
         </select>
+        <div class="field-hint">Groq je 16.8.2026 ugasio Llama 3.3/3.1 modele — zamijenjeni GPT-OSS modelima.</div>
       </div>
     </div>
 
@@ -746,7 +745,7 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
           max_tokens: 1024,
           system,
           tools: TOOLS,
-          messages,
+          messages: stripInternalFields(messages),
         }),
       });
       if (!res.ok) throw await httpError(res, 'Anthropic');
@@ -758,6 +757,24 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
       };
     }
   };
+
+  // Removes our internal bookkeeping fields (prefixed with _) that some
+  // adapters attach to content blocks (e.g. Gemini's _thoughtSignature,
+  // _tool_name). Anthropic's API validates message schema strictly and
+  // rejects any unrecognized field, so these must never leak through.
+  function stripInternalFields(messages) {
+    return messages.map(msg => {
+      if (!Array.isArray(msg.content)) return msg;
+      const cleanContent = msg.content.map(block => {
+        const clean = {};
+        for (const key in block) {
+          if (!key.startsWith('_')) clean[key] = block[key];
+        }
+        return clean;
+      });
+      return { ...msg, content: cleanContent };
+    });
+  }
 
   // ---------------- GEMINI ----------------
   const geminiAdapter = {
@@ -1021,7 +1038,7 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     models: {
       anthropic: localStorage.getItem('jarvis_anthropic_model') || 'claude-sonnet-4-6',
       gemini: localStorage.getItem('jarvis_gemini_model') || 'gemini-3-flash-preview',
-      groq: localStorage.getItem('jarvis_groq_model') || 'llama-3.3-70b-versatile',
+      groq: localStorage.getItem('jarvis_groq_model') || 'openai/gpt-oss-120b',
       openrouter: localStorage.getItem('jarvis_openrouter_model') || 'meta-llama/llama-3.3-70b-instruct:free',
       openrouterCustom: localStorage.getItem('jarvis_openrouter_custom') || '',
     },
