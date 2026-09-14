@@ -799,9 +799,15 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     } else if (Array.isArray(msg.content)) {
       for (const block of msg.content) {
         if (block.type === 'text') {
-          if (block.text) parts.push({ text: block.text });
+          if (block.text) {
+            const part = { text: block.text };
+            if (block._thoughtSignature) part.thoughtSignature = block._thoughtSignature;
+            parts.push(part);
+          }
         } else if (block.type === 'tool_use') {
-          parts.push({ functionCall: { name: block.name, args: block.input || {} } });
+          const part = { functionCall: { name: block.name, args: block.input || {} } };
+          if (block._thoughtSignature) part.thoughtSignature = block._thoughtSignature;
+          parts.push(part);
         } else if (block.type === 'tool_result') {
           // find the matching tool name from previous history — Gemini needs name, not id
           const name = block._tool_name || 'unknown';
@@ -820,16 +826,21 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     const content = [];
     let hasToolUse = false;
     for (const part of parts) {
+      const sig = part.thoughtSignature; // Gemini 3 requires echoing this back
       if (part.text) {
-        content.push({ type: 'text', text: part.text });
+        const block = { type: 'text', text: part.text };
+        if (sig) block._thoughtSignature = sig;
+        content.push(block);
       } else if (part.functionCall) {
         hasToolUse = true;
-        content.push({
+        const block = {
           type: 'tool_use',
           id: `gemini_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           name: part.functionCall.name,
           input: part.functionCall.args || {},
-        });
+        };
+        if (sig) block._thoughtSignature = sig;
+        content.push(block);
       }
     }
     return {
