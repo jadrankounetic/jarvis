@@ -549,11 +549,9 @@
       <div class="field">
         <label>Model</label>
         <select id="geminiModel">
-          <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash — balanced, free</option>
-          <option value="gemini-2.5-pro">Gemini 2.5 Pro — max quality (limit 2 req/min)</option>
-          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite — highest volume</option>
-          <option value="gemini-1.5-flash">Gemini 1.5 Flash — stable</option>
+          <option value="gemini-3-flash-preview" selected>Gemini 3 Flash Preview — frontier-class, free tier</option>
         </select>
+        <div class="field-hint">Besplatan tier, brz i kvalitetan.</div>
       </div>
     </div>
 
@@ -1006,7 +1004,7 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     // Model per provider
     models: {
       anthropic: localStorage.getItem('jarvis_anthropic_model') || 'claude-sonnet-4-6',
-      gemini: localStorage.getItem('jarvis_gemini_model') || 'gemini-2.5-flash',
+      gemini: localStorage.getItem('jarvis_gemini_model') || 'gemini-3-flash-preview',
       groq: localStorage.getItem('jarvis_groq_model') || 'llama-3.3-70b-versatile',
       openrouter: localStorage.getItem('jarvis_openrouter_model') || 'meta-llama/llama-3.3-70b-instruct:free',
       openrouterCustom: localStorage.getItem('jarvis_openrouter_custom') || '',
