@@ -774,7 +774,12 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
           description: t.description,
           parameters: t.input_schema,
         }))}],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        generationConfig: {
+          maxOutputTokens: 1024,
+          // Gemini 3 defaults to 'high' thinking which adds 5-15s latency.
+          // 'low' is Google's recommendation for voice assistants and chat.
+          thinkingConfig: { thinkingLevel: 'low' },
+        },
       };
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const res = await fetch(url, {
@@ -1194,8 +1199,13 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
 
       if (result.stop_reason !== 'tool_use' || toolResults.length === 0) break;
 
-      // Send tool results back
+      // Send tool results back to close the loop (required by Claude and OpenAI protocols)
       state.history.push({ role: 'user', content: toolResults });
+
+      // Optimization: skip the follow-up round if the model already spoke before
+      // the tool call. Our tools are display-only (map/YouTube/link) — a follow-up
+      // just adds 5-10s of latency without new useful info for the user.
+      if (collectedText.length > 0) break;
     }
 
     persistHistory();
