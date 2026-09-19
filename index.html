@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --bg-deep: #000308;
@@ -273,6 +274,45 @@
     background: radial-gradient(circle at 35% 30%, #ffffff, var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
   }
 
+  /* Wake word badge */
+  .wake-badge {
+    font-size: 9px; color: var(--gold);
+    border: 1px solid rgba(255, 181, 71, 0.4);
+    padding: 2px 6px; border-radius: 3px;
+    letter-spacing: 0.15em;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  /* Reminders list (Settings) */
+  .reminders-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+  .reminder-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border: 1px solid var(--border);
+    background: rgba(77, 214, 255, 0.04); font-size: 12px;
+  }
+  .reminder-item .reminder-time { color: var(--gold); font-size: 10px; margin-top: 2px; }
+  .reminder-item button {
+    background: transparent; border: 1px solid var(--red); color: var(--red);
+    width: 24px; height: 24px; border-radius: 3px; cursor: pointer;
+    flex-shrink: 0; margin-left: 8px; font-size: 14px; line-height: 1;
+  }
+  .reminders-empty, .calendar-empty { color: var(--text-dim); font-size: 11px; padding: 6px 0; }
+
+  /* Calendar card */
+  .calendar-list { padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .calendar-item { padding: 8px 10px; border-left: 2px solid var(--cyan); background: rgba(77, 214, 255, 0.04); }
+  .calendar-item-title { font-size: 13px; color: var(--cyan-bright); }
+  .calendar-item-time { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Document card */
+  .doc-fields { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .doc-row { display: flex; gap: 8px; font-size: 12px; }
+  .doc-label { color: var(--gold); flex-shrink: 0; min-width: 90px; }
+  .doc-value { color: var(--text); }
+
+  /* Google Calendar connect button */
+  #googleConnectionStatus { color: var(--text-dim); }
+
   .mic-area {
     padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column;
@@ -484,6 +524,7 @@
     <div class="brand">
       <div class="brand-dot"></div>
       <span>J.A.R.V.I.S.</span>
+      <span class="wake-badge" id="wakeBadge" style="display:none;">👂 WAKE</span>
     </div>
     <div class="topbar-right">
       <button class="icon-btn" id="clearBtn" title="Clear conversation">⟲</button>
@@ -516,7 +557,7 @@
 
   <div class="mic-area">
     <div class="action-row">
-      <button class="camera-btn" id="cameraBtn" title="Camera">📷</button>
+      <button class="camera-btn" id="cameraBtn" title="Tap: describe scene · Hold: read document">📷</button>
       <button class="mic-btn" id="micBtn" data-active="false">🎤</button>
     </div>
     <div class="mic-hint" id="micHint">Tap to speak</div>
@@ -648,6 +689,50 @@
       </div>
     </div>
 
+    <h3>Wake Word</h3>
+
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">"Hej Jarvise" — stalno slušanje</div>
+        <div class="toggle-desc">Sluša u pozadini dok je aplikacija otvorena; kaži "Jarvise" da aktiviraš. Troši bateriju i podatke.</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="wakeWordToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="info-note">
+      Radi samo dok je ekran upaljen i aplikacija u prednjem planu (ograničenje mobilnih preglednika — nije pravi "uvijek uključen" wake word kao kod native aplikacija). Ekran će ostati upaljen dok je ovo uključeno.
+    </div>
+
+    <h3>Reminders</h3>
+    <div id="remindersList" class="reminders-list"></div>
+    <div class="info-note">
+      Podsjetnike dodaješ glasom ("podsjeti me za 20 minuta da..."). Rade pouzdano dok je app otvorena; za podsjetnike sutra ili za nekoliko sati preglednik na Androidu može ugasiti tab u pozadini pa se neće oglasiti — najbolje za bliske podsjetnike (minute do par sati).
+    </div>
+
+    <h3>Google Calendar</h3>
+    <div class="field">
+      <label>Google OAuth Client ID</label>
+      <input type="text" id="googleClientIdInput" placeholder="123...apps.googleusercontent.com">
+      <div class="field-hint">
+        Napravi na <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com</a>:
+        1) Novi projekt → 2) Enable "Google Calendar API" → 3) OAuth consent screen (External, dodaj sebe kao test user) → 4) Credentials → Create OAuth Client ID → Web application → Authorized JavaScript origins: tvoj GitHub Pages URL (npr. https://username.github.io) → Create → kopiraj Client ID.
+      </div>
+    </div>
+    <div class="field">
+      <div class="toggle-label">Status: <span id="googleConnectionStatus">NOT CONNECTED</span></div>
+      <button class="btn" type="button" id="connectGoogleBtn" style="margin-top:8px;">Connect Google Calendar</button>
+      <div class="field-hint">Spajanje traje otprilike sat vremena po sesiji (Google ograničenje za pristup bez backend servera) — ponovi klik ako kalendar prestane raditi.</div>
+    </div>
+
+    <h3>Web Search</h3>
+    <div class="field">
+      <label>Tavily API Key (optional)</label>
+      <input type="password" id="tavilyKey" placeholder="tvly-...">
+      <div class="field-hint">Besplatno — 1000 pretraga/mjesec, bez kartice. <a href="https://app.tavily.com" target="_blank">app.tavily.com</a>. Bez ovoga Jarvis ne može tražiti aktualne informacije na webu.</div>
+    </div>
+
     <h3>Language & Voice</h3>
 
     <div class="field">
@@ -705,7 +790,7 @@
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
-  const SYSTEM_PROMPT = `You are J.A.R.V.I.S. — Just A Rather Very Intelligent System — a personal AI assistant inspired by Iron Man's JARVIS.
+  const SYSTEM_PROMPT_BASE = `You are J.A.R.V.I.S. — Just A Rather Very Intelligent System — a personal AI assistant inspired by Iron Man's JARVIS.
 
 Personality:
 - Sophisticated, articulate, dry wit. Slightly British in English.
@@ -722,18 +807,38 @@ Language:
 - Detect the user's language from their message and reply in the same language.
 - Croatian/Bosnian/Serbian: write naturally as a native speaker would.
 
-Visual tools — you have three tools available:
-- show_map — when the user asks about places, locations, directions, routes, or wants to see somewhere
-- show_youtube — when the user wants to watch, listen to, or find a video, song, or clip
-- show_link — when directing the user to a specific webpage
+Tools available:
+- show_map — place, location, address, or directions requests
+- show_youtube — video, music, or clip requests
+- show_link — directing the user to a specific webpage
+- set_reminder — the user wants to be reminded of something later, either after a delay ("in 20 minutes") or at a specific time ("tomorrow at 3pm"). Resolve the relative time yourself using the current date/time given below, then call with an exact ISO 8601 datetime.
+- get_calendar_events — the user asks what's on their calendar or schedule for some day/range
+- create_calendar_event — the user asks to schedule, book, or add something to their calendar
+- web_search — call this whenever the answer depends on current, real-time, or very recent information (news, prices, scores, "who is currently...", or any fact you're not fully certain about). Don't guess when a quick search would confirm it.
 
-When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Plotting the route now.") and THEN call the tool. Don't describe what's on the map/video — the user will see it. Don't read out URLs aloud.`;
+For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
+For action tools (set_reminder/calendar/web_search): call directly, then briefly summarize the result in speech.`;
+
+  function buildSystemPrompt() {
+    return SYSTEM_PROMPT_BASE + `\n\nCurrent date and time (use this to resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm"): ${new Date().toString()}`;
+  }
 
   const VISION_SYSTEM_PROMPT = `You are J.A.R.V.I.S. analyzing a photo just captured from the user's phone camera.
 Describe what you see clearly and concisely — 2 to 4 sentences, spoken aloud, so use plain prose only, no markdown, no lists, no emoji.
 Reply in the same language the user used in their request (if they asked in Croatian, reply in Croatian).
 If the user asked a specific question about the image, answer that question directly using what's visible.
 If no specific question was asked, give a clear, useful description of the scene — mention anything particularly relevant (readable text, potential hazards, notable objects).`;
+
+  const DOCUMENT_SYSTEM_PROMPT = `You are J.A.R.V.I.S. reading a document, receipt, invoice, or business card from a photo.
+
+Respond in EXACTLY this format, nothing else:
+SPOKEN: <one short natural sentence summarizing the key info, to be read aloud — e.g. "It's a receipt from IKEA for 45 euros, dated today.">
+FIELDS:
+Label: value
+Label: value
+(one line per field you can confidently read — vendor/name, date, total/amount with currency, invoice number, phone, email, etc. Omit fields you can't read. Don't guess.)
+
+Reply in the same language the user used, or Croatian if unclear. No markdown, no extra commentary outside this format.`;
 
   // ==================================================================
   // STANDARD TOOL DEFINITIONS (Anthropic-style internal format)
@@ -773,6 +878,54 @@ If no specific question was asked, give a clear, useful description of the scene
           description: { type: 'string', description: 'Optional one-line description' }
         },
         required: ['url', 'title']
+      }
+    },
+    {
+      name: 'set_reminder',
+      description: 'Schedule a reminder for the user, either after a delay or at a specific date/time. Resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm" into an exact ISO 8601 datetime using the current date/time given in context.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Short description of what to remind the user about.' },
+          datetime_iso: { type: 'string', description: 'Exact ISO 8601 datetime (e.g. 2026-09-15T15:00:00) when the reminder should fire.' }
+        },
+        required: ['message', 'datetime_iso']
+      }
+    },
+    {
+      name: 'get_calendar_events',
+      description: "Get the user's Google Calendar events for a date/time range. Use when asked what's on their schedule or calendar.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          time_min_iso: { type: 'string', description: 'Start of range, ISO 8601. Defaults to now if omitted.' },
+          time_max_iso: { type: 'string', description: 'End of range, ISO 8601. Defaults to 24 hours after time_min if omitted.' }
+        }
+      }
+    },
+    {
+      name: 'create_calendar_event',
+      description: "Create a new event on the user's Google Calendar.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: 'Event title.' },
+          start_iso: { type: 'string', description: 'Start datetime, ISO 8601.' },
+          end_iso: { type: 'string', description: 'End datetime, ISO 8601. Defaults to 30 minutes after start if omitted.' },
+          description: { type: 'string', description: 'Optional event details.' }
+        },
+        required: ['summary', 'start_iso']
+      }
+    },
+    {
+      name: 'web_search',
+      description: 'Search the web for current, real-time, or recent information — news, prices, scores, or any fact you are not fully certain about. Use instead of guessing.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Concise search query, a few words.' }
+        },
+        required: ['query']
       }
     }
   ];
@@ -1106,6 +1259,14 @@ If no specific question was asked, give a clear, useful description of the scene
     pitch: parseFloat(localStorage.getItem('jarvis_pitch') || '0.85'),
     // Language
     lang: localStorage.getItem('jarvis_lang') || 'auto',
+    // Wake word (kept separate from chat-provider `keys` map on purpose)
+    wakeWordEnabled: localStorage.getItem('jarvis_wake_word') === 'true',
+    // Web search (Tavily) — NOT part of `keys`, which is reserved for chat LLM providers
+    tavilyKey: localStorage.getItem('jarvis_tavily_key') || '',
+    // Google Calendar (OAuth access token is short-lived and kept in memory only)
+    googleClientId: localStorage.getItem('jarvis_google_client_id') || '',
+    googleAccessToken: null,
+    googleTokenExpiry: 0,
     // Runtime
     history: [],
     recognition: null,
@@ -1248,7 +1409,7 @@ If no specific question was asked, give a clear, useful description of the scene
         apiKey: state.keys[providerName],
         model,
         messages: trimmed,
-        system: SYSTEM_PROMPT,
+        system: buildSystemPrompt(),
       });
 
       // Push assistant turn
@@ -1261,7 +1422,7 @@ If no specific question was asked, give a clear, useful description of the scene
           collectedText.push(block.text);
           addMessage('assistant', block.text, { provider: adapter.label });
         } else if (block.type === 'tool_use') {
-          const outcome = executeTool(block);
+          const outcome = await executeTool(block);
           toolResults.push({
             type: 'tool_result',
             tool_use_id: block.id,
@@ -1419,12 +1580,234 @@ If no specific question was asked, give a clear, useful description of the scene
     transcript.scrollTop = transcript.scrollHeight;
   }
 
-  function executeTool(toolUse) {
+  // ==================================================================
+  // REMINDERS
+  // ==================================================================
+  const reminderTimers = {}; // id -> timeoutId (runtime only)
+
+  function loadReminders() {
+    try { return JSON.parse(localStorage.getItem('jarvis_reminders') || '[]'); }
+    catch { return []; }
+  }
+  function saveReminders(list) {
+    try { localStorage.setItem('jarvis_reminders', JSON.stringify(list)); } catch {}
+  }
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+  function scheduleReminderTimer(reminder) {
+    const delay = Math.max(0, reminder.fireAt - Date.now());
+    reminderTimers[reminder.id] = setTimeout(() => fireReminder(reminder.id), delay);
+  }
+  function fireReminder(id) {
+    const list = loadReminders();
+    const idx = list.findIndex(r => r.id === id);
+    if (idx === -1) return;
+    const reminder = list[idx];
+    list.splice(idx, 1);
+    saveReminders(list);
+    delete reminderTimers[id];
+    renderRemindersInSettings();
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('J.A.R.V.I.S.', { body: reminder.message }); } catch {}
+    }
+    if (document.visibilityState === 'visible' && !state.processing && !state.speaking) {
+      addMessage('assistant', reminder.message);
+      speak(reminder.message, state.lang === 'auto' ? state.currentLang : state.lang);
+    }
+  }
+  function addReminder(message, datetimeIso) {
+    const fireAt = new Date(datetimeIso).getTime();
+    if (isNaN(fireAt)) throw new Error('Invalid datetime for reminder.');
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    const reminder = { id: `rem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, message, fireAt };
+    const list = loadReminders();
+    list.push(reminder);
+    saveReminders(list);
+    scheduleReminderTimer(reminder);
+    renderRemindersInSettings();
+    return reminder;
+  }
+  function removeReminder(id) {
+    let list = loadReminders();
+    list = list.filter(r => r.id !== id);
+    saveReminders(list);
+    if (reminderTimers[id]) { clearTimeout(reminderTimers[id]); delete reminderTimers[id]; }
+    renderRemindersInSettings();
+  }
+  function initReminders() {
+    const list = loadReminders();
+    const now = Date.now();
+    for (const r of list) {
+      if (r.fireAt <= now) fireReminder(r.id);
+      else scheduleReminderTimer(r);
+    }
+    renderRemindersInSettings();
+  }
+  function renderRemindersInSettings() {
+    const container = $('remindersList');
+    if (!container) return;
+    const list = loadReminders().sort((a, b) => a.fireAt - b.fireAt);
+    if (!list.length) {
+      container.innerHTML = '<div class="reminders-empty">Nema aktivnih podsjetnika.</div>';
+      return;
+    }
+    container.innerHTML = list.map(r => {
+      const timeStr = new Date(r.fireAt).toLocaleString();
+      return `<div class="reminder-item">
+        <div><div>${escapeHtml(r.message)}</div><div class="reminder-time">${timeStr}</div></div>
+        <button data-id="${r.id}" class="reminder-delete" type="button">×</button>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.reminder-delete').forEach(btn => {
+      btn.addEventListener('click', () => removeReminder(btn.dataset.id));
+    });
+  }
+
+  // ==================================================================
+  // GOOGLE CALENDAR (client-side OAuth via Google Identity Services)
+  // ==================================================================
+  let googleTokenClient = null;
+
+  function initGoogleTokenClient() {
+    if (!window.google || !google.accounts || !google.accounts.oauth2) return null;
+    if (!state.googleClientId) return null;
+    if (googleTokenClient) return googleTokenClient;
+    googleTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: state.googleClientId,
+      scope: 'https://www.googleapis.com/auth/calendar.events',
+      callback: (resp) => {
+        if (resp.error) {
+          addMessage('error', `Google Calendar: ${resp.error}`);
+          return;
+        }
+        state.googleAccessToken = resp.access_token;
+        state.googleTokenExpiry = Date.now() + (resp.expires_in ? resp.expires_in * 1000 : 3600000);
+        updateGoogleConnectionStatus();
+      },
+    });
+    return googleTokenClient;
+  }
+  function connectGoogleCalendar() {
+    state.googleClientId = $('googleClientIdInput').value.trim();
+    if (!state.googleClientId) { addMessage('error', 'Unesi Google OAuth Client ID prije spajanja.'); return; }
+    localStorage.setItem('jarvis_google_client_id', state.googleClientId);
+    const client = initGoogleTokenClient();
+    if (!client) { addMessage('error', 'Google Identity Services se nije učitao. Provjeri internet vezu i pokušaj opet.'); return; }
+    client.requestAccessToken();
+  }
+  function hasValidGoogleToken() {
+    return !!state.googleAccessToken && Date.now() < (state.googleTokenExpiry || 0);
+  }
+  function updateGoogleConnectionStatus() {
+    const el = $('googleConnectionStatus');
+    if (!el) return;
+    el.textContent = hasValidGoogleToken() ? 'CONNECTED' : 'NOT CONNECTED';
+    el.style.color = hasValidGoogleToken() ? 'var(--gold)' : 'var(--text-dim)';
+  }
+  async function getCalendarEvents(timeMinIso, timeMaxIso) {
+    if (!hasValidGoogleToken()) throw new Error('Google Calendar not connected. Open Settings and tap Connect Google Calendar.');
+    const params = new URLSearchParams({
+      timeMin: timeMinIso || new Date().toISOString(),
+      timeMax: timeMaxIso || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      maxResults: '15',
+    });
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+      headers: { Authorization: `Bearer ${state.googleAccessToken}` },
+    });
+    if (!res.ok) throw await httpError(res, 'Google Calendar');
+    const data = await res.json();
+    return data.items || [];
+  }
+  async function createCalendarEvent(input) {
+    if (!hasValidGoogleToken()) throw new Error('Google Calendar not connected. Open Settings and tap Connect Google Calendar.');
+    const body = {
+      summary: input.summary || 'Reminder',
+      description: input.description || undefined,
+      start: { dateTime: input.start_iso },
+      end: { dateTime: input.end_iso || new Date(new Date(input.start_iso).getTime() + 30 * 60000).toISOString() },
+    };
+    const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${state.googleAccessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await httpError(res, 'Google Calendar');
+    return await res.json();
+  }
+  function renderCalendarCard(events) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const card = document.createElement('div');
+    card.className = 'card card-calendar';
+    const itemsHtml = events.length
+      ? events.map(() => `<div class="calendar-item"><div class="calendar-item-title"></div><div class="calendar-item-time"></div></div>`).join('')
+      : `<div class="calendar-empty">Nema događaja.</div>`;
+    card.innerHTML = `<div class="card-header"><span class="card-header-icon">📅</span> CALENDAR</div><div class="calendar-list">${itemsHtml}</div>`;
+    const titleEls = card.querySelectorAll('.calendar-item-title');
+    const timeEls = card.querySelectorAll('.calendar-item-time');
+    events.forEach((e, i) => {
+      if (titleEls[i]) titleEls[i].textContent = e.summary || '(no title)';
+      if (timeEls[i]) {
+        const start = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleString() : (e.start?.date || '');
+        timeEls[i].textContent = start;
+      }
+    });
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  // ==================================================================
+  // WEB SEARCH (Tavily)
+  // ==================================================================
+  async function performWebSearch(query) {
+    if (!state.tavilyKey) throw new Error('Web search requires a Tavily API key (Settings).');
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.tavilyKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, search_depth: 'basic', max_results: 5, include_answer: true }),
+    });
+    if (!res.ok) throw await httpError(res, 'Tavily');
+    const data = await res.json();
+    let summary = '';
+    if (data.answer) summary += data.answer + '\n\n';
+    if (Array.isArray(data.results)) {
+      summary += data.results.slice(0, 5).map(r => `- ${r.title}: ${(r.content || '').slice(0, 200)} (${r.url})`).join('\n');
+    }
+    return summary.trim() || 'No results found.';
+  }
+
+  async function executeTool(toolUse) {
     try {
       switch (toolUse.name) {
         case 'show_map':     renderMapCard(toolUse.input);     return 'Map displayed to user.';
         case 'show_youtube': renderYouTubeCard(toolUse.input); return 'YouTube card displayed to user.';
         case 'show_link':    renderLinkCard(toolUse.input);    return 'Link card displayed to user.';
+        case 'set_reminder': {
+          const r = addReminder(toolUse.input.message, toolUse.input.datetime_iso);
+          return `Reminder scheduled for ${new Date(r.fireAt).toLocaleString()}.`;
+        }
+        case 'get_calendar_events': {
+          const events = await getCalendarEvents(toolUse.input.time_min_iso, toolUse.input.time_max_iso);
+          renderCalendarCard(events);
+          if (!events.length) return 'No events found in that range.';
+          return events.map(e => `${e.summary || '(no title)'} at ${e.start?.dateTime || e.start?.date}`).join('; ');
+        }
+        case 'create_calendar_event': {
+          const ev = await createCalendarEvent(toolUse.input);
+          return `Event "${ev.summary}" created for ${ev.start?.dateTime}.`;
+        }
+        case 'web_search':
+          return await performWebSearch(toolUse.input.query);
         default: return 'Unknown tool.';
       }
     } catch (e) {
@@ -1454,6 +1837,8 @@ If no specific question was asked, give a clear, useful description of the scene
     if (state.recognizing || state.processing || state.speaking) return;
     const anyKey = Object.values(state.keys).some(k => k);
     if (!anyKey) { openSettings(); return; }
+
+    stopWakeWordListening(); // avoid two SpeechRecognition instances running at once
 
     if (!state.recognition) state.recognition = initRecognition();
     if (!state.recognition) {
@@ -1491,10 +1876,12 @@ If no specific question was asked, give a clear, useful description of the scene
       state.recognizing = false;
       if (interimEl) interimEl.remove();
       if (finalText.trim()) {
-        if (isCameraIntent(finalText)) handleCameraRequest(finalText.trim(), lang);
+        if (isDocumentIntent(finalText)) handleCameraRequest(finalText.trim(), lang, { mode: 'document' });
+        else if (isCameraIntent(finalText)) handleCameraRequest(finalText.trim(), lang);
         else handleUserMessage(finalText.trim(), lang);
       } else {
         setState('idle');
+        resumeWakeWordIfEnabled();
       }
       updateMic();
     };
@@ -1507,6 +1894,124 @@ If no specific question was asked, give a clear, useful description of the scene
       try { state.recognition.stop(); } catch {}
     }
   }
+
+  // ==================================================================
+  // WAKE WORD ("Hey Jarvis")
+  // ==================================================================
+  // Limitation (communicated to the user in Settings): this uses the
+  // browser's Web Speech API in continuous mode — it only works while the
+  // tab stays open and the screen is on. It is NOT a true always-on native
+  // wake word; Android will suspend the mic/JS timers once the tab is
+  // backgrounded or the screen sleeps. A wake lock is used to help keep the
+  // screen on while this mode is enabled.
+  let passiveRecognition = null;
+  let passiveRestartTimer = null;
+  let wakeLockSentinel = null;
+
+  function canRunPassive() {
+    return state.wakeWordEnabled && !state.recognizing && !state.processing && !state.speaking && !state.cameraActive;
+  }
+
+  function extractAfterWakeWord(text) {
+    const m = text.match(/jarvis\w*/i);
+    if (!m) return text.trim();
+    return text.slice(m.index + m[0].length).replace(/^[,.\s!?-]+/, '').trim();
+  }
+
+  function updateWakeBadge() {
+    const badge = $('wakeBadge');
+    if (!badge) return;
+    badge.style.display = (state.wakeWordEnabled && passiveRecognition) ? 'inline-block' : 'none';
+  }
+
+  function startWakeWordListening() {
+    if (!canRunPassive()) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    if (passiveRecognition) { try { passiveRecognition.onend = null; passiveRecognition.stop(); } catch {} }
+
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.lang = state.lang === 'auto' ? state.currentLang : state.lang;
+
+    rec.onresult = (e) => {
+      if (!canRunPassive()) return;
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (!e.results[i].isFinal) continue;
+        const text = e.results[i][0].transcript || '';
+        if (/jarvis/i.test(text)) {
+          const command = extractAfterWakeWord(text);
+          try { rec.stop(); } catch {}
+          if (command.length > 2) {
+            if (isDocumentIntent(command)) handleCameraRequest(command, rec.lang, { mode: 'document' });
+            else if (isCameraIntent(command)) handleCameraRequest(command, rec.lang);
+            else handleUserMessage(command, rec.lang);
+          } else {
+            startListening();
+          }
+          return;
+        }
+      }
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        state.wakeWordEnabled = false;
+        localStorage.setItem('jarvis_wake_word', 'false');
+        addMessage('error', 'Mikrofon nije dopušten za wake word način.');
+        updateWakeBadge();
+      }
+      // 'no-speech' fires often in continuous mode — ignored, onend restarts it
+    };
+    rec.onend = () => {
+      passiveRecognition = null;
+      if (canRunPassive()) {
+        clearTimeout(passiveRestartTimer);
+        passiveRestartTimer = setTimeout(startWakeWordListening, 400);
+      } else {
+        updateWakeBadge();
+      }
+    };
+
+    try {
+      rec.start();
+      passiveRecognition = rec;
+      updateWakeBadge();
+    } catch (e) { /* another recognition instance may already be starting — ignore */ }
+  }
+
+  function stopWakeWordListening() {
+    clearTimeout(passiveRestartTimer);
+    if (passiveRecognition) {
+      try { passiveRecognition.onend = null; passiveRecognition.stop(); } catch {}
+      passiveRecognition = null;
+    }
+    updateWakeBadge();
+  }
+
+  function resumeWakeWordIfEnabled() {
+    if (state.wakeWordEnabled) startWakeWordListening();
+  }
+
+  function syncWakeWordListening() {
+    if (state.wakeWordEnabled) { acquireWakeLock(); startWakeWordListening(); }
+    else { releaseWakeLock(); stopWakeWordListening(); }
+  }
+
+  async function acquireWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; });
+      }
+    } catch (e) { /* not critical — feature still works, screen just may sleep */ }
+  }
+  function releaseWakeLock() {
+    if (wakeLockSentinel) { try { wakeLockSentinel.release(); } catch {} wakeLockSentinel = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.wakeWordEnabled) acquireWakeLock();
+  });
 
   // ==================================================================
   // CAMERA / VISION
@@ -1664,8 +2169,8 @@ If no specific question was asked, give a clear, useful description of the scene
     let lastErr;
     for (const providerName of available) {
       try {
-        if (providerName === 'anthropic') return await describeImageAnthropic(base64Jpeg, promptText);
-        if (providerName === 'gemini') return await describeImageGemini(base64Jpeg, promptText);
+        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400);
+        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400);
       } catch (err) {
         lastErr = err;
         console.warn(`${providerName} vision failed: ${err.message}`);
@@ -1675,7 +2180,69 @@ If no specific question was asked, give a clear, useful description of the scene
     throw lastErr || new Error('Vision request failed.');
   }
 
-  async function describeImageAnthropic(base64Jpeg, promptText) {
+  async function describeDocument(base64Jpeg, userText, lang) {
+    const order = ['anthropic', 'gemini'];
+    const available = order.filter(p => state.keys[p]);
+    if (!available.length) {
+      throw new Error(isHr(lang) ? 'Za čitanje dokumenta treba Anthropic ili Gemini API ključ.' : 'Document reading requires an Anthropic or Gemini API key.');
+    }
+    const promptText = (userText && userText.trim())
+      ? userText.trim()
+      : (isHr(lang) ? 'Pročitaj ovaj dokument.' : 'Read this document.');
+
+    let lastErr;
+    for (const providerName of available) {
+      try {
+        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500);
+        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`${providerName} document vision failed: ${err.message}`);
+        if (available.length > 1) addMessage('error', `${providerName} vision failed (${err.message}), trying next...`);
+      }
+    }
+    throw lastErr || new Error('Vision request failed.');
+  }
+
+  function parseDocumentResponse(raw) {
+    const spokenMatch = raw.match(/SPOKEN:\s*(.+)/i);
+    const spoken = spokenMatch ? spokenMatch[1].trim() : raw.trim();
+    const fields = [];
+    const fieldsIdx = raw.search(/FIELDS:/i);
+    if (fieldsIdx !== -1) {
+      const fieldsBlock = raw.slice(fieldsIdx).replace(/FIELDS:/i, '');
+      fieldsBlock.split('\n').forEach(line => {
+        const m = line.match(/^\s*([^:]{1,40}):\s*(.+?)\s*$/);
+        if (m) fields.push({ label: m[1].trim(), value: m[2].trim() });
+      });
+    }
+    return { spoken, fields };
+  }
+
+  function renderDocumentCard(fields) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const card = document.createElement('div');
+    card.className = 'card card-document';
+    const rows = fields.length
+      ? fields.map(() => `<div class="doc-row"><span class="doc-label"></span><span class="doc-value"></span></div>`).join('')
+      : `<div class="calendar-empty">Nema prepoznatih polja.</div>`;
+    card.innerHTML = `<div class="card-header"><span class="card-header-icon">📄</span> DOCUMENT</div><div class="doc-fields">${rows}</div>`;
+    const labelEls = card.querySelectorAll('.doc-label');
+    const valueEls = card.querySelectorAll('.doc-value');
+    fields.forEach((f, i) => {
+      if (labelEls[i]) labelEls[i].textContent = f.label + ':';
+      if (valueEls[i]) valueEls[i].textContent = f.value;
+    });
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function isDocumentIntent(text) {
+    const t = (text || '').toLowerCase();
+    return /ra[čc]un|priznanic|dokument|skeniraj\s+(ra[čc]un|dokument)|receipt|invoice|scan\s+(this\s+)?document|read\s+(this\s+)?document|extract\s+(data|text)|posjetnic/.test(t);
+  }
+
+  async function callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1686,8 +2253,8 @@ If no specific question was asked, give a clear, useful description of the scene
       },
       body: JSON.stringify({
         model: state.models.anthropic,
-        max_tokens: 400,
-        system: VISION_SYSTEM_PROMPT,
+        max_tokens: maxTokens || 400,
+        system: systemPrompt,
         messages: [{
           role: 'user',
           content: [
@@ -1702,7 +2269,7 @@ If no specific question was asked, give a clear, useful description of the scene
     return (data.content || []).map(b => b.text || '').join(' ').trim();
   }
 
-  async function describeImageGemini(base64Jpeg, promptText) {
+  async function callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.models.gemini)}:generateContent`;
     const res = await fetch(url, {
       method: 'POST',
@@ -1715,8 +2282,8 @@ If no specific question was asked, give a clear, useful description of the scene
             { text: promptText },
           ],
         }],
-        systemInstruction: { parts: [{ text: VISION_SYSTEM_PROMPT }] },
-        generationConfig: { maxOutputTokens: 400, thinkingConfig: { thinkingLevel: 'low' } },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { maxOutputTokens: maxTokens || 400, thinkingConfig: { thinkingLevel: 'low' } },
       }),
     });
     if (!res.ok) throw await httpError(res, 'Gemini');
@@ -1725,20 +2292,25 @@ If no specific question was asked, give a clear, useful description of the scene
     return parts.map(p => p.text || '').join(' ').trim();
   }
 
-  async function handleCameraRequest(spokenText, lang) {
+  async function handleCameraRequest(spokenText, lang, opts = {}) {
     if (state.recognizing || state.processing || state.speaking || state.cameraActive) return;
+    const mode = opts.mode === 'document' ? 'document' : 'scene';
 
     const visionAvailable = state.keys.anthropic || state.keys.gemini;
     const label = (spokenText && spokenText.trim())
       ? spokenText.trim()
-      : (isHr(lang) ? '📷 Aktiviram kameru' : '📷 Activating camera');
+      : (mode === 'document'
+          ? (isHr(lang) ? '📄 Skeniram dokument' : '📄 Scanning document')
+          : (isHr(lang) ? '📷 Aktiviram kameru' : '📷 Activating camera'));
     addMessage('user', label);
 
     if (!visionAvailable) {
       addMessage('error', isHr(lang) ? 'Za analizu slike treba Anthropic ili Gemini API ključ (Settings).' : 'Image analysis requires an Anthropic or Gemini API key (Settings).');
+      resumeWakeWordIfEnabled();
       return;
     }
 
+    stopWakeWordListening();
     state.cameraActive = true; setState('camera'); updateMic();
     let base64;
     try {
@@ -1748,26 +2320,39 @@ If no specific question was asked, give a clear, useful description of the scene
       addMessage('error', `Camera: ${err.message}`);
       setState('error'); setTimeout(() => setState('idle'), 1500);
       updateMic();
+      resumeWakeWordIfEnabled();
       return;
     }
     state.cameraActive = false;
 
-    if (!base64) { setState('idle'); updateMic(); return; } // user cancelled
+    if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; } // user cancelled
 
     state.processing = true; setState('thinking'); updateMic();
     try {
-      const description = await describeImage(base64, spokenText, lang);
-      state.processing = false;
-      if (description) {
-        addMessage('assistant', description);
-        // Persist as text-only turns (image itself is not stored — keeps
-        // localStorage small and avoids re-sending large payloads)
-        state.history.push({ role: 'user', content: (spokenText && spokenText.trim()) || (isHr(lang) ? 'Poslao sam sliku s kamere.' : 'I sent a photo from the camera.') });
-        state.history.push({ role: 'assistant', content: description });
+      if (mode === 'document') {
+        const raw = await describeDocument(base64, spokenText, lang);
+        const { spoken, fields } = parseDocumentResponse(raw);
+        renderDocumentCard(fields);
+        state.processing = false;
+        addMessage('assistant', spoken);
+        state.history.push({ role: 'user', content: (spokenText && spokenText.trim()) || (isHr(lang) ? 'Skenirao sam dokument.' : 'I scanned a document.') });
+        state.history.push({ role: 'assistant', content: spoken });
         persistHistory();
-        await speak(description, lang);
+        await speak(spoken, lang);
       } else {
-        setState('idle'); updateMic();
+        const description = await describeImage(base64, spokenText, lang);
+        state.processing = false;
+        if (description) {
+          addMessage('assistant', description);
+          // Persist as text-only turns (image itself is not stored — keeps
+          // localStorage small and avoids re-sending large payloads)
+          state.history.push({ role: 'user', content: (spokenText && spokenText.trim()) || (isHr(lang) ? 'Poslao sam sliku s kamere.' : 'I sent a photo from the camera.') });
+          state.history.push({ role: 'assistant', content: description });
+          persistHistory();
+          await speak(description, lang);
+        } else {
+          setState('idle'); updateMic();
+        }
       }
     } catch (err) {
       state.processing = false;
@@ -1775,6 +2360,7 @@ If no specific question was asked, give a clear, useful description of the scene
       setState('error'); setTimeout(() => setState('idle'), 2000);
       updateMic();
     }
+    resumeWakeWordIfEnabled();
   }
 
   // ==================================================================
@@ -1798,6 +2384,7 @@ If no specific question was asked, give a clear, useful description of the scene
       console.warn('Voice failed', e);
     } finally {
       state.speaking = false; setState('idle'); updateMic();
+      resumeWakeWordIfEnabled();
     }
   }
 
@@ -1859,14 +2446,15 @@ If no specific question was asked, give a clear, useful description of the scene
     try {
       const reply = await chatWithProviders(text);
       state.processing = false;
-      if (reply) await speak(reply, lang);
-      else { setState('idle'); updateMic(); }
+      if (reply) await speak(reply, lang); // speak()'s finally resumes wake word
+      else { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); }
     } catch (err) {
       state.processing = false;
       addMessage('error', err.message);
       setState('error');
       setTimeout(() => setState('idle'), 2000);
       updateMic();
+      resumeWakeWordIfEnabled();
     }
   }
 
@@ -1889,12 +2477,18 @@ If no specific question was asked, give a clear, useful description of the scene
     $('forcedProviderSelect').value = state.forcedProvider;
     $('forcedProviderField').style.display = state.autoRouting ? 'none' : 'block';
 
+    $('wakeWordToggle').checked = state.wakeWordEnabled;
+    $('googleClientIdInput').value = state.googleClientId;
+    $('tavilyKey').value = state.tavilyKey;
+
     $('elevenKeyInput').value = state.elevenKey;
     $('elevenVoiceSelect').value = state.elevenVoice;
     $('langSelect').value = state.lang;
     $('pitchSlider').value = state.pitch;
 
     updateProviderTabIndicators();
+    updateGoogleConnectionStatus();
+    renderRemindersInSettings();
 
     $('settingsModal').dataset.open = 'true';
   }
@@ -1916,6 +2510,11 @@ If no specific question was asked, give a clear, useful description of the scene
     state.autoRouting = $('autoRoutingToggle').checked;
     state.forcedProvider = $('forcedProviderSelect').value;
 
+    const wasWakeEnabled = state.wakeWordEnabled;
+    state.wakeWordEnabled = $('wakeWordToggle').checked;
+    state.googleClientId = $('googleClientIdInput').value.trim();
+    state.tavilyKey = $('tavilyKey').value.trim();
+
     state.elevenKey = $('elevenKeyInput').value.trim();
     state.elevenVoice = $('elevenVoiceSelect').value;
     state.lang = $('langSelect').value;
@@ -1935,6 +2534,10 @@ If no specific question was asked, give a clear, useful description of the scene
     localStorage.setItem('jarvis_auto_routing', String(state.autoRouting));
     localStorage.setItem('jarvis_forced_provider', state.forcedProvider);
 
+    localStorage.setItem('jarvis_wake_word', String(state.wakeWordEnabled));
+    localStorage.setItem('jarvis_google_client_id', state.googleClientId);
+    localStorage.setItem('jarvis_tavily_key', state.tavilyKey);
+
     localStorage.setItem('jarvis_eleven_key', state.elevenKey);
     localStorage.setItem('jarvis_eleven_voice', state.elevenVoice);
     localStorage.setItem('jarvis_lang', state.lang);
@@ -1942,15 +2545,22 @@ If no specific question was asked, give a clear, useful description of the scene
 
     refreshStatusBar();
     closeSettings();
+
+    // Only touch the mic/wake-word listeners if the toggle actually changed,
+    // to avoid interrupting an unrelated in-progress interaction.
+    if (wasWakeEnabled !== state.wakeWordEnabled) syncWakeWordListening();
   }
 
   function resetAll() {
     if (!confirm('Erase ALL API keys, conversation, and settings?')) return;
+    stopWakeWordListening();
+    releaseWakeLock();
     const keysToRemove = [
       'jarvis_anthropic_key', 'jarvis_gemini_key', 'jarvis_groq_key', 'jarvis_openrouter_key',
       'jarvis_anthropic_model', 'jarvis_gemini_model', 'jarvis_groq_model', 'jarvis_openrouter_model',
       'jarvis_openrouter_custom',
       'jarvis_auto_routing', 'jarvis_forced_provider',
+      'jarvis_wake_word', 'jarvis_google_client_id', 'jarvis_tavily_key', 'jarvis_reminders',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
       // Legacy keys from older versions
@@ -2001,6 +2611,12 @@ If no specific question was asked, give a clear, useful description of the scene
     sysStatus.style.color = configuredCount ? '' : 'var(--gold)';
   }
 
+  // Tools safe to silently re-run when redrawing old history on page load
+  // (pure display, no side effects). Action tools (reminders, calendar,
+  // search) must NEVER replay here — that would re-fire a search, create
+  // duplicate calendar events, etc.
+  const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
+
   function rehydrateHistory() {
     if (!state.history.length) return;
     const eh = emptyHint(); if (eh) eh.remove();
@@ -2010,7 +2626,7 @@ If no specific question was asked, give a clear, useful description of the scene
       } else if (Array.isArray(m.content)) {
         for (const b of m.content) {
           if (b.type === 'text' && b.text) addMessage(m.role === 'user' ? 'user' : 'assistant', b.text);
-          else if (b.type === 'tool_use') executeTool(b);
+          else if (b.type === 'tool_use' && REPLAYABLE_TOOLS.has(b.name)) executeTool(b);
         }
       }
     }
@@ -2020,15 +2636,32 @@ If no specific question was asked, give a clear, useful description of the scene
   // WIRE UP
   // ==================================================================
   micBtn.addEventListener('click', () => state.recognizing ? stopListening() : startListening());
-  $('cameraBtn').addEventListener('click', () => {
-    const lang = state.lang === 'auto' ? state.currentLang : state.lang;
-    handleCameraRequest('', lang);
-  });
+  (() => {
+    let camPressTimer = null;
+    let camLongPressTriggered = false;
+    const camBtn = $('cameraBtn');
+    camBtn.addEventListener('touchstart', () => {
+      camLongPressTriggered = false;
+      camPressTimer = setTimeout(() => {
+        camLongPressTriggered = true;
+        const lang = state.lang === 'auto' ? state.currentLang : state.lang;
+        handleCameraRequest('', lang, { mode: 'document' });
+      }, 550);
+    }, { passive: true });
+    camBtn.addEventListener('touchend', () => clearTimeout(camPressTimer));
+    camBtn.addEventListener('touchcancel', () => clearTimeout(camPressTimer));
+    camBtn.addEventListener('click', () => {
+      if (camLongPressTriggered) { camLongPressTriggered = false; return; } // handled by long-press already
+      const lang = state.lang === 'auto' ? state.currentLang : state.lang;
+      handleCameraRequest('', lang, { mode: 'scene' });
+    });
+  })();
   $('settingsBtn').addEventListener('click', openSettings);
   $('clearBtn').addEventListener('click', clearHistory);
   $('saveSettings').addEventListener('click', saveSettings);
   $('closeSettings').addEventListener('click', closeSettings);
   $('resetAll').addEventListener('click', resetAll);
+  $('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
 
   // Provider tab switching
   document.querySelectorAll('.provider-tab').forEach(tab => {
@@ -2077,6 +2710,11 @@ If no specific question was asked, give a clear, useful description of the scene
   const anyKey = Object.values(state.keys).some(k => k);
   if (!anyKey) setTimeout(openSettings, 400);
   if (state.lang === 'auto' && navigator.language) state.currentLang = navigator.language;
+
+  // Resume any pending reminders from a previous session, and start
+  // wake-word listening if it was left enabled.
+  initReminders();
+  if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
 })();
 </script>
 </body>
