@@ -313,6 +313,32 @@
   /* Google Calendar connect button */
   #googleConnectionStatus { color: var(--text-dim); }
 
+  /* Boot sequence overlay */
+  .boot-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--bg-deep);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.5s ease;
+  }
+  .boot-overlay.hidden { opacity: 0; pointer-events: none; }
+  .boot-lines {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--cyan);
+    line-height: 2;
+    text-shadow: 0 0 8px var(--cyan);
+    min-width: 240px;
+  }
+  .boot-line { opacity: 0; animation: boot-fade-in 0.3s ease forwards; display: flex; justify-content: space-between; gap: 20px; }
+  @keyframes boot-fade-in { to { opacity: 1; } }
+  .boot-status { color: var(--cyan-bright); }
+
+  /* Personality slider labels */
+  .slider-labels {
+    display: flex; justify-content: space-between;
+    font-size: 9px; color: var(--text-dim);
+    margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
   .mic-area {
     padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column;
@@ -518,6 +544,10 @@
 </style>
 </head>
 <body>
+
+<div class="boot-overlay" id="bootOverlay">
+  <div class="boot-lines" id="bootLines"></div>
+</div>
 
 <div class="app">
   <div class="topbar">
@@ -733,6 +763,63 @@
       <div class="field-hint">Besplatno — 1000 pretraga/mjesec, bez kartice. <a href="https://app.tavily.com" target="_blank">app.tavily.com</a>. Bez ovoga Jarvis ne može tražiti aktualne informacije na webu.</div>
     </div>
 
+    <h3>Protocols</h3>
+    <div id="protocolsList" class="reminders-list"></div>
+    <div class="field">
+      <label>Protocol Name</label>
+      <input type="text" id="protocolNameInput" placeholder="npr. Jutro">
+    </div>
+    <div class="field">
+      <label>Protocol Prompt</label>
+      <input type="text" id="protocolPromptInput" placeholder="npr. Reci mi kalendar za danas i jednu zanimljivu vijest.">
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" type="button" id="addProtocolBtn">Add Protocol</button>
+    </div>
+    <div class="info-note">
+      Aktiviraj glasom: "Jarvise, pokreni protokol [ime]". Prompt može biti složena rečenica — Jarvis će sam iskoristiti kalendar, pretragu ili druge alate ako zatreba.
+    </div>
+
+    <h3>Personality</h3>
+    <div class="field">
+      <label>Ton odgovora</label>
+      <input type="range" id="personalitySlider" min="0" max="2" step="1" value="1">
+      <div class="slider-labels">
+        <span>Profesionalan</span><span>Balansiran</span><span>Sarkastičan</span>
+      </div>
+    </div>
+
+    <h3>Boot Sequence</h3>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Animacija paljenja sustava</div>
+        <div class="toggle-desc">Kratka "suit up" sekvenca pri svakom otvaranju aplikacije.</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="bootSequenceToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <h3>Morning Briefing</h3>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Jutarnji brifing bez pitanja</div>
+        <div class="toggle-desc">Kad prvi put otvoriš app u danu, Jarvis sam progovori kratki pregled.</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="morningBriefingToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="field">
+      <label>Briefing Prompt</label>
+      <input type="text" id="morningBriefingPrompt" value="Daj mi kratki jutarnji pregled: što imam u kalendaru danas i jedna zanimljiva vijest iz svijeta. Budi kratak.">
+    </div>
+    <div class="info-note">
+      Okine se jednom po kalendarskom danu, pri prvom otvaranju aplikacije taj dan (bilo koje doba dana).
+    </div>
+
     <h3>Language & Voice</h3>
 
     <div class="field">
@@ -819,8 +906,17 @@ Tools available:
 For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
 For action tools (set_reminder/calendar/web_search): call directly, then briefly summarize the result in speech.`;
 
+  const PERSONALITY_LINES = [
+    'Tone override: strictly professional and formal. No jokes, no irony, minimal small talk — efficient and businesslike at all times.',
+    'Tone override: balanced — polite and warm, with occasional light wit, like a trusted professional aide.',
+    "Tone override: sharp, dry, sarcastic wit — like Tony Stark's JARVIS gently teasing him. Add a clever quip or light jab where it fits naturally, but never let sarcasm get in the way of actually being helpful.",
+  ];
+
   function buildSystemPrompt() {
-    return SYSTEM_PROMPT_BASE + `\n\nCurrent date and time (use this to resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm"): ${new Date().toString()}`;
+    const personalityLine = PERSONALITY_LINES[state.personality] ?? PERSONALITY_LINES[1];
+    return SYSTEM_PROMPT_BASE
+      + `\n\n${personalityLine}`
+      + `\n\nCurrent date and time (use this to resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm"): ${new Date().toString()}`;
   }
 
   const VISION_SYSTEM_PROMPT = `You are J.A.R.V.I.S. analyzing a photo just captured from the user's phone camera.
@@ -1267,6 +1363,15 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     googleClientId: localStorage.getItem('jarvis_google_client_id') || '',
     googleAccessToken: null,
     googleTokenExpiry: 0,
+    // Personality (0 = professional, 1 = balanced, 2 = sarcastic/Tony-style)
+    personality: parseInt(localStorage.getItem('jarvis_personality') || '1', 10),
+    // Boot sequence
+    bootSequenceEnabled: localStorage.getItem('jarvis_boot_sequence') !== 'false',
+    // Morning briefing
+    morningBriefingEnabled: localStorage.getItem('jarvis_morning_briefing') === 'true',
+    morningBriefingPrompt: localStorage.getItem('jarvis_morning_prompt') || 'Daj mi kratki jutarnji pregled: što imam u kalendaru danas i jedna zanimljiva vijest iz svijeta. Budi kratak.',
+    // Protocols (named sequences the user defines; loaded below)
+    protocols: [],
     // Runtime
     history: [],
     recognition: null,
@@ -1277,6 +1382,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     currentLang: 'en-US',
     lastProviderUsed: null,
   };
+
+  // Load protocols separately with try/catch
+  try {
+    state.protocols = JSON.parse(localStorage.getItem('jarvis_protocols') || '[]');
+  } catch { state.protocols = []; }
 
   // Load history separately with try/catch
   try {
@@ -1670,6 +1780,106 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   }
 
   // ==================================================================
+  // PROTOCOLS (named, user-defined action sequences)
+  // ==================================================================
+  function loadProtocols() {
+    try { return JSON.parse(localStorage.getItem('jarvis_protocols') || '[]'); }
+    catch { return []; }
+  }
+  function saveProtocols(list) {
+    try { localStorage.setItem('jarvis_protocols', JSON.stringify(list)); } catch {}
+  }
+  function addProtocol(name, prompt) {
+    const list = loadProtocols();
+    list.push({ id: `proto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), prompt: prompt.trim() });
+    saveProtocols(list);
+    state.protocols = list;
+    renderProtocolsInSettings();
+  }
+  function removeProtocol(id) {
+    const list = loadProtocols().filter(p => p.id !== id);
+    saveProtocols(list);
+    state.protocols = list;
+    renderProtocolsInSettings();
+  }
+  function renderProtocolsInSettings() {
+    const container = $('protocolsList');
+    if (!container) return;
+    const list = state.protocols;
+    if (!list.length) {
+      container.innerHTML = '<div class="reminders-empty">Nema definiranih protokola.</div>';
+      return;
+    }
+    container.innerHTML = list.map(p => {
+      const preview = p.prompt.length > 60 ? p.prompt.slice(0, 60) + '…' : p.prompt;
+      return `<div class="reminder-item">
+        <div><div>⚡ ${escapeHtml(p.name)}</div><div class="reminder-time">${escapeHtml(preview)}</div></div>
+        <button data-id="${p.id}" class="reminder-delete" type="button">×</button>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.reminder-delete').forEach(btn => {
+      btn.addEventListener('click', () => removeProtocol(btn.dataset.id));
+    });
+  }
+  function findProtocolByName(name) {
+    const n = name.toLowerCase().trim();
+    return state.protocols.find(p => p.name.toLowerCase() === n)
+      || state.protocols.find(p => p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase()));
+  }
+  function matchProtocolIntent(text) {
+    const t = (text || '').trim();
+    const m = t.match(/(?:pokreni|aktiviraj|upali)\s+protokol\s+(.+)/i) || t.match(/(?:run|activate|initiate|start)\s+protocol\s+(.+)/i);
+    if (!m) return null;
+    const name = m[1].trim().replace(/[.!?]+$/, '');
+    return findProtocolByName(name);
+  }
+
+  // ==================================================================
+  // BOOT SEQUENCE
+  // ==================================================================
+  const BOOT_LINES = [
+    ['ARC REACTOR', 'ONLINE'],
+    ['VOICE RECOGNITION', 'CALIBRATED'],
+    ['NEURAL LINK', 'SYNCHRONIZED'],
+    ['SYSTEMS', 'NOMINAL'],
+  ];
+  async function runBootSequence() {
+    const overlay = $('bootOverlay');
+    const linesEl = $('bootLines');
+    if (!overlay || !linesEl) return;
+    linesEl.innerHTML = '';
+    for (const [label, status] of BOOT_LINES) {
+      const line = document.createElement('div');
+      line.className = 'boot-line';
+      line.innerHTML = `<span>${label}</span><span class="boot-status">${status}</span>`;
+      linesEl.appendChild(line);
+      await new Promise(r => setTimeout(r, 280));
+    }
+    await new Promise(r => setTimeout(r, 350));
+    overlay.classList.add('hidden');
+    setTimeout(() => overlay.remove(), 500);
+  }
+
+  // ==================================================================
+  // MORNING BRIEFING
+  // ==================================================================
+  function localDateStamp(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function maybeRunMorningBriefing() {
+    if (!state.morningBriefingEnabled) return;
+    const today = localDateStamp();
+    if (localStorage.getItem('jarvis_last_briefing_date') === today) return;
+    localStorage.setItem('jarvis_last_briefing_date', today);
+    const lang = state.lang === 'auto' ? state.currentLang : state.lang;
+    const prompt = state.morningBriefingPrompt || 'Give me a short morning briefing.';
+    const delay = state.bootSequenceEnabled ? 2200 : 600; // wait out the boot overlay so the message isn't hidden behind it
+    setTimeout(() => {
+      handleUserMessage(prompt, lang, { displayText: isHr(lang) ? '☀️ Jutarnji brifing' : '☀️ Morning briefing' });
+    }, delay);
+  }
+
+  // ==================================================================
   // GOOGLE CALENDAR (client-side OAuth via Google Identity Services)
   // ==================================================================
   let googleTokenClient = null;
@@ -1876,7 +2086,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       state.recognizing = false;
       if (interimEl) interimEl.remove();
       if (finalText.trim()) {
-        if (isDocumentIntent(finalText)) handleCameraRequest(finalText.trim(), lang, { mode: 'document' });
+        const protocol = matchProtocolIntent(finalText);
+        if (protocol) handleUserMessage(protocol.prompt, lang, { displayText: `⚡ ${protocol.name}` });
+        else if (isDocumentIntent(finalText)) handleCameraRequest(finalText.trim(), lang, { mode: 'document' });
         else if (isCameraIntent(finalText)) handleCameraRequest(finalText.trim(), lang);
         else handleUserMessage(finalText.trim(), lang);
       } else {
@@ -1944,7 +2156,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           const command = extractAfterWakeWord(text);
           try { rec.stop(); } catch {}
           if (command.length > 2) {
-            if (isDocumentIntent(command)) handleCameraRequest(command, rec.lang, { mode: 'document' });
+            const protocol = matchProtocolIntent(command);
+            if (protocol) handleUserMessage(protocol.prompt, rec.lang, { displayText: `⚡ ${protocol.name}` });
+            else if (isDocumentIntent(command)) handleCameraRequest(command, rec.lang, { mode: 'document' });
             else if (isCameraIntent(command)) handleCameraRequest(command, rec.lang);
             else handleUserMessage(command, rec.lang);
           } else {
@@ -2440,8 +2654,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ==================================================================
   // MAIN FLOW
   // ==================================================================
-  async function handleUserMessage(text, lang) {
-    addMessage('user', text);
+  async function handleUserMessage(text, lang, opts = {}) {
+    addMessage('user', opts.displayText || text);
     state.processing = true; setState('thinking'); updateMic();
     try {
       const reply = await chatWithProviders(text);
@@ -2481,6 +2695,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     $('googleClientIdInput').value = state.googleClientId;
     $('tavilyKey').value = state.tavilyKey;
 
+    $('personalitySlider').value = state.personality;
+    $('bootSequenceToggle').checked = state.bootSequenceEnabled;
+    $('morningBriefingToggle').checked = state.morningBriefingEnabled;
+    $('morningBriefingPrompt').value = state.morningBriefingPrompt;
+
     $('elevenKeyInput').value = state.elevenKey;
     $('elevenVoiceSelect').value = state.elevenVoice;
     $('langSelect').value = state.lang;
@@ -2489,6 +2708,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     updateProviderTabIndicators();
     updateGoogleConnectionStatus();
     renderRemindersInSettings();
+    renderProtocolsInSettings();
 
     $('settingsModal').dataset.open = 'true';
   }
@@ -2515,6 +2735,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     state.googleClientId = $('googleClientIdInput').value.trim();
     state.tavilyKey = $('tavilyKey').value.trim();
 
+    state.personality = parseInt($('personalitySlider').value, 10);
+    state.bootSequenceEnabled = $('bootSequenceToggle').checked;
+    state.morningBriefingEnabled = $('morningBriefingToggle').checked;
+    state.morningBriefingPrompt = $('morningBriefingPrompt').value.trim() || state.morningBriefingPrompt;
+
     state.elevenKey = $('elevenKeyInput').value.trim();
     state.elevenVoice = $('elevenVoiceSelect').value;
     state.lang = $('langSelect').value;
@@ -2537,6 +2762,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     localStorage.setItem('jarvis_wake_word', String(state.wakeWordEnabled));
     localStorage.setItem('jarvis_google_client_id', state.googleClientId);
     localStorage.setItem('jarvis_tavily_key', state.tavilyKey);
+
+    localStorage.setItem('jarvis_personality', String(state.personality));
+    localStorage.setItem('jarvis_boot_sequence', String(state.bootSequenceEnabled));
+    localStorage.setItem('jarvis_morning_briefing', String(state.morningBriefingEnabled));
+    localStorage.setItem('jarvis_morning_prompt', state.morningBriefingPrompt);
 
     localStorage.setItem('jarvis_eleven_key', state.elevenKey);
     localStorage.setItem('jarvis_eleven_voice', state.elevenVoice);
@@ -2561,6 +2791,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       'jarvis_openrouter_custom',
       'jarvis_auto_routing', 'jarvis_forced_provider',
       'jarvis_wake_word', 'jarvis_google_client_id', 'jarvis_tavily_key', 'jarvis_reminders',
+      'jarvis_personality', 'jarvis_boot_sequence', 'jarvis_morning_briefing', 'jarvis_morning_prompt',
+      'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
       // Legacy keys from older versions
@@ -2662,6 +2894,14 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   $('closeSettings').addEventListener('click', closeSettings);
   $('resetAll').addEventListener('click', resetAll);
   $('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
+  $('addProtocolBtn').addEventListener('click', () => {
+    const name = $('protocolNameInput').value.trim();
+    const prompt = $('protocolPromptInput').value.trim();
+    if (!name || !prompt) return;
+    addProtocol(name, prompt);
+    $('protocolNameInput').value = '';
+    $('protocolPromptInput').value = '';
+  });
 
   // Provider tab switching
   document.querySelectorAll('.provider-tab').forEach(tab => {
@@ -2715,6 +2955,13 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // wake-word listening if it was left enabled.
   initReminders();
   if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
+
+  // Boot sequence animation, or skip straight past it if disabled
+  if (state.bootSequenceEnabled) runBootSequence();
+  else { const bo = $('bootOverlay'); if (bo) bo.remove(); }
+
+  // Fires once per calendar day, on first open
+  maybeRunMorningBriefing();
 })();
 </script>
 </body>
