@@ -242,12 +242,59 @@
   .card-youtube .card-header { color: #ff8888; }
   .card-youtube .card-link-icon { border-color: #ff8888; color: #ffaaaa; }
 
+  /* Camera card */
+  .card-camera img { width: 100%; display: block; }
+  .camera-frame {
+    position: relative; width: 100%; aspect-ratio: 4 / 3;
+    background: #000; overflow: hidden;
+  }
+  .camera-frame video {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .camera-frame .corner { border-color: var(--cyan-bright); }
+  .camera-controls {
+    display: flex; gap: 10px; padding: 10px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .camera-controls button {
+    flex: 1; padding: 10px;
+    font-family: 'Orbitron', sans-serif; font-size: 11px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; border: 1px solid var(--cyan);
+    background: transparent; color: var(--cyan);
+    transition: all 0.2s;
+  }
+  .camera-controls button:active { background: var(--cyan); color: #000; }
+  .camera-btn-cancel { border-color: var(--red) !important; color: var(--red) !important; }
+  .camera-btn-cancel:active { background: var(--red) !important; color: #000 !important; }
+
+  .reactor-wrap[data-state="camera"] .core {
+    animation: pulse-listen 1.2s ease-in-out infinite;
+    background: radial-gradient(circle at 35% 30%, #ffffff, var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
+  }
+
   .mic-area {
     padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column;
     align-items: center; gap: 10px;
     border-top: 1px solid var(--border);
   }
+  .action-row {
+    display: flex; align-items: center; justify-content: center; gap: 22px;
+  }
+  .camera-btn {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    background: rgba(77, 214, 255, 0.05);
+    color: var(--cyan);
+    font-size: 20px;
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .camera-btn:active { transform: scale(0.92); background: rgba(77, 214, 255, 0.15); }
+  .camera-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .mic-btn {
     position: relative; width: 84px; height: 84px;
     border-radius: 50%; border: 2px solid var(--cyan);
@@ -468,7 +515,10 @@
   </div>
 
   <div class="mic-area">
-    <button class="mic-btn" id="micBtn" data-active="false">🎤</button>
+    <div class="action-row">
+      <button class="camera-btn" id="cameraBtn" title="Camera">📷</button>
+      <button class="mic-btn" id="micBtn" data-active="false">🎤</button>
+    </div>
     <div class="mic-hint" id="micHint">Tap to speak</div>
   </div>
 </div>
@@ -678,6 +728,12 @@ Visual tools — you have three tools available:
 - show_link — when directing the user to a specific webpage
 
 When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Plotting the route now.") and THEN call the tool. Don't describe what's on the map/video — the user will see it. Don't read out URLs aloud.`;
+
+  const VISION_SYSTEM_PROMPT = `You are J.A.R.V.I.S. analyzing a photo just captured from the user's phone camera.
+Describe what you see clearly and concisely — 2 to 4 sentences, spoken aloud, so use plain prose only, no markdown, no lists, no emoji.
+Reply in the same language the user used in their request (if they asked in Croatian, reply in Croatian).
+If the user asked a specific question about the image, answer that question directly using what's visible.
+If no specific question was asked, give a clear, useful description of the scene — mention anything particularly relevant (readable text, potential hazards, notable objects).`;
 
   // ==================================================================
   // STANDARD TOOL DEFINITIONS (Anthropic-style internal format)
@@ -1056,6 +1112,7 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     recognizing: false,
     processing: false,
     speaking: false,
+    cameraActive: false,
     currentLang: 'en-US',
     lastProviderUsed: null,
   };
@@ -1262,15 +1319,18 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
 
   function setState(s) {
     reactor.dataset.state = s;
-    const labels = { idle: 'STANDBY', listening: 'LISTENING', thinking: 'PROCESSING', speaking: 'RESPONDING', error: 'ERROR' };
+    const labels = { idle: 'STANDBY', listening: 'LISTENING', thinking: 'PROCESSING', speaking: 'RESPONDING', error: 'ERROR', camera: 'CAMERA READY' };
     stateLabel.textContent = labels[s] || s.toUpperCase();
   }
 
   function updateMic() {
     micBtn.dataset.active = state.recognizing ? 'true' : 'false';
-    micBtn.disabled = state.processing || state.speaking;
+    micBtn.disabled = state.processing || state.speaking || state.cameraActive;
+    const camBtn = $('cameraBtn');
+    if (camBtn) camBtn.disabled = state.processing || state.speaking || state.recognizing || state.cameraActive;
     if (state.processing) micHint.textContent = 'Thinking...';
     else if (state.speaking) micHint.textContent = 'Speaking...';
+    else if (state.cameraActive) micHint.textContent = 'Camera active...';
     else if (state.recognizing) micHint.textContent = 'Listening — tap to stop';
     else micHint.textContent = 'Tap to speak';
   }
@@ -1430,8 +1490,12 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
     r.onend = () => {
       state.recognizing = false;
       if (interimEl) interimEl.remove();
-      if (finalText.trim()) handleUserMessage(finalText.trim(), lang);
-      else setState('idle');
+      if (finalText.trim()) {
+        if (isCameraIntent(finalText)) handleCameraRequest(finalText.trim(), lang);
+        else handleUserMessage(finalText.trim(), lang);
+      } else {
+        setState('idle');
+      }
       updateMic();
     };
 
@@ -1441,6 +1505,275 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
   function stopListening() {
     if (state.recognition && state.recognizing) {
       try { state.recognition.stop(); } catch {}
+    }
+  }
+
+  // ==================================================================
+  // CAMERA / VISION
+  // ==================================================================
+  function isHr(lang) { return (lang || '').toLowerCase().startsWith('hr'); }
+
+  function isCameraIntent(text) {
+    const t = (text || '').toLowerCase();
+    const patterns = [
+      /\bslikaj\b/, /\bfotografiraj\b/, /\buslikaj\b/,
+      /\bnapravi\s+(mi\s+)?(sliku|fotku|fotografiju)\b/,
+      /\b(uklju[čc]i|upali|otvori)\s+kameru\b/,
+      /\bpogledaj\s+(ovo|kroz\s+kameru)\b/,
+      /\b[šs]to\s+(ja\s+)?(gledam|vidi[šs])\b/,
+      /\bopi[šs]i\s+(ovo|sliku|[šs]to\s+(gledam|vidim))\b/,
+      /\bprepoznaj\s+(ovo|sliku)\b/,
+      /\bskeniraj\b/,
+      /\btake\s+a\s+(photo|picture|pic)\b/,
+      /\bopen\s+(the\s+)?camera\b/,
+      /\bturn\s+on\s+(the\s+)?camera\b/,
+      /\bwhat\s+do\s+you\s+see\b/,
+      /\blook\s+at\s+this\b/,
+      /\bdescribe\s+(this|what\s+i'?m\s+looking\s+at|the\s+image)\b/,
+      /\bscan\s+this\b/,
+      /\bidentify\s+this\b/,
+    ];
+    return patterns.some(re => re.test(t));
+  }
+
+  // Opens a live camera preview inline in the transcript. Resolves with a
+  // base64 JPEG (no data: prefix) on capture, or null if the user cancels.
+  function captureFromCamera() {
+    return new Promise(async (resolve, reject) => {
+      const eh = emptyHint(); if (eh) eh.remove();
+      const card = document.createElement('div');
+      card.className = 'card card-camera';
+      card.innerHTML = `
+        <div class="card-header"><span class="card-header-icon">◎</span> CAMERA</div>
+        <div class="camera-frame">
+          <video autoplay playsinline muted></video>
+          <div class="corner corner-tl"></div>
+          <div class="corner corner-tr"></div>
+          <div class="corner corner-bl"></div>
+          <div class="corner corner-br"></div>
+        </div>
+        <div class="camera-controls">
+          <button class="camera-btn-cancel" type="button">✕ Cancel</button>
+          <button class="camera-btn-capture" type="button">◉ Capture</button>
+        </div>`;
+      transcript.appendChild(card);
+      transcript.scrollTop = transcript.scrollHeight;
+
+      const video = card.querySelector('video');
+      const captureBtn = card.querySelector('.camera-btn-capture');
+      const cancelBtn = card.querySelector('.camera-btn-cancel');
+      let stream = null;
+
+      const stopStream = () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
+
+      cancelBtn.onclick = () => { stopStream(); card.remove(); resolve(null); };
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('unsupported');
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+      } catch (err) {
+        // Fallback: native camera app via file input (works even without live-preview support)
+        card.remove();
+        try { resolve(await captureViaFileInput()); }
+        catch (e2) { reject(e2); }
+        return;
+      }
+
+      captureBtn.onclick = () => {
+        try {
+          const maxDim = 1024;
+          const vw = video.videoWidth || 1280, vh = video.videoHeight || 960;
+          const scale = Math.min(1, maxDim / Math.max(vw, vh));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(vw * scale);
+          canvas.height = Math.round(vh * scale);
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+          stopStream();
+          card.innerHTML = `<div class="card-header"><span class="card-header-icon">◎</span> CAPTURED</div><img src="${dataUrl}" alt="captured">`;
+          resolve(dataUrl.split(',')[1]);
+        } catch (e) {
+          stopStream();
+          card.remove();
+          reject(e);
+        }
+      };
+    });
+  }
+
+  // Fallback path: opens the phone's native camera app via a file input.
+  function captureViaFileInput() {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+
+      const cleanup = () => { if (input.parentNode) document.body.removeChild(input); };
+
+      input.onchange = () => {
+        const file = input.files && input.files[0];
+        cleanup();
+        if (!file) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 1024;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+            const eh = emptyHint(); if (eh) eh.remove();
+            const card = document.createElement('div');
+            card.className = 'card card-camera';
+            card.innerHTML = `<div class="card-header"><span class="card-header-icon">◎</span> CAPTURED</div><img src="${dataUrl}" alt="captured">`;
+            transcript.appendChild(card);
+            transcript.scrollTop = transcript.scrollHeight;
+
+            resolve(dataUrl.split(',')[1]);
+          };
+          img.onerror = () => reject(new Error('Image decode failed'));
+          img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('File read failed'));
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    });
+  }
+
+  async function describeImage(base64Jpeg, userText, lang) {
+    const order = ['anthropic', 'gemini'];
+    const available = order.filter(p => state.keys[p]);
+    if (!available.length) {
+      throw new Error(isHr(lang) ? 'Za analizu slike treba Anthropic ili Gemini API ključ.' : 'Image analysis requires an Anthropic or Gemini API key.');
+    }
+    const promptText = (userText && userText.trim())
+      ? userText.trim()
+      : (isHr(lang) ? 'Opiši što vidiš na ovoj slici.' : 'Describe what you see in this image.');
+
+    let lastErr;
+    for (const providerName of available) {
+      try {
+        if (providerName === 'anthropic') return await describeImageAnthropic(base64Jpeg, promptText);
+        if (providerName === 'gemini') return await describeImageGemini(base64Jpeg, promptText);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`${providerName} vision failed: ${err.message}`);
+        if (available.length > 1) addMessage('error', `${providerName} vision failed (${err.message}), trying next...`);
+      }
+    }
+    throw lastErr || new Error('Vision request failed.');
+  }
+
+  async function describeImageAnthropic(base64Jpeg, promptText) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.keys.anthropic,
+        'anthropic-version': ANTHROPIC_VERSION,
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: state.models.anthropic,
+        max_tokens: 400,
+        system: VISION_SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
+            { type: 'text', text: promptText },
+          ],
+        }],
+      }),
+    });
+    if (!res.ok) throw await httpError(res, 'Anthropic');
+    const data = await res.json();
+    return (data.content || []).map(b => b.text || '').join(' ').trim();
+  }
+
+  async function describeImageGemini(base64Jpeg, promptText) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.models.gemini)}:generateContent`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.keys.gemini },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType: 'image/jpeg', data: base64Jpeg } },
+            { text: promptText },
+          ],
+        }],
+        systemInstruction: { parts: [{ text: VISION_SYSTEM_PROMPT }] },
+        generationConfig: { maxOutputTokens: 400, thinkingConfig: { thinkingLevel: 'low' } },
+      }),
+    });
+    if (!res.ok) throw await httpError(res, 'Gemini');
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    return parts.map(p => p.text || '').join(' ').trim();
+  }
+
+  async function handleCameraRequest(spokenText, lang) {
+    if (state.recognizing || state.processing || state.speaking || state.cameraActive) return;
+
+    const visionAvailable = state.keys.anthropic || state.keys.gemini;
+    const label = (spokenText && spokenText.trim())
+      ? spokenText.trim()
+      : (isHr(lang) ? '📷 Aktiviram kameru' : '📷 Activating camera');
+    addMessage('user', label);
+
+    if (!visionAvailable) {
+      addMessage('error', isHr(lang) ? 'Za analizu slike treba Anthropic ili Gemini API ključ (Settings).' : 'Image analysis requires an Anthropic or Gemini API key (Settings).');
+      return;
+    }
+
+    state.cameraActive = true; setState('camera'); updateMic();
+    let base64;
+    try {
+      base64 = await captureFromCamera();
+    } catch (err) {
+      state.cameraActive = false;
+      addMessage('error', `Camera: ${err.message}`);
+      setState('error'); setTimeout(() => setState('idle'), 1500);
+      updateMic();
+      return;
+    }
+    state.cameraActive = false;
+
+    if (!base64) { setState('idle'); updateMic(); return; } // user cancelled
+
+    state.processing = true; setState('thinking'); updateMic();
+    try {
+      const description = await describeImage(base64, spokenText, lang);
+      state.processing = false;
+      if (description) {
+        addMessage('assistant', description);
+        // Persist as text-only turns (image itself is not stored — keeps
+        // localStorage small and avoids re-sending large payloads)
+        state.history.push({ role: 'user', content: (spokenText && spokenText.trim()) || (isHr(lang) ? 'Poslao sam sliku s kamere.' : 'I sent a photo from the camera.') });
+        state.history.push({ role: 'assistant', content: description });
+        persistHistory();
+        await speak(description, lang);
+      } else {
+        setState('idle'); updateMic();
+      }
+    } catch (err) {
+      state.processing = false;
+      addMessage('error', err.message);
+      setState('error'); setTimeout(() => setState('idle'), 2000);
+      updateMic();
     }
   }
 
@@ -1687,6 +2020,10 @@ When using a tool, ALWAYS first speak a short sentence (e.g. "Of course, sir. Pl
   // WIRE UP
   // ==================================================================
   micBtn.addEventListener('click', () => state.recognizing ? stopListening() : startListening());
+  $('cameraBtn').addEventListener('click', () => {
+    const lang = state.lang === 'auto' ? state.currentLang : state.lang;
+    handleCameraRequest('', lang);
+  });
   $('settingsBtn').addEventListener('click', openSettings);
   $('clearBtn').addEventListener('click', clearHistory);
   $('saveSettings').addEventListener('click', saveSettings);
