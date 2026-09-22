@@ -313,6 +313,16 @@
   /* Google Calendar connect button */
   #googleConnectionStatus { color: var(--text-dim); }
 
+  /* Usage / expenses summary table */
+  .usage-table { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .usage-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border: 1px solid var(--border);
+    background: rgba(77, 214, 255, 0.04); font-size: 11px;
+  }
+  .usage-row .usage-name { color: var(--cyan-bright); font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 0.1em; }
+  .usage-row .usage-numbers { color: var(--text-dim); text-align: right; }
+
   /* Boot sequence overlay */
   .boot-overlay {
     position: fixed; inset: 0; z-index: 200;
@@ -735,6 +745,21 @@
       Radi samo dok je ekran upaljen i aplikacija u prednjem planu (ograničenje mobilnih preglednika — nije pravi "uvijek uključen" wake word kao kod native aplikacija). Ekran će ostati upaljen dok je ovo uključeno.
     </div>
 
+    <h3>Continuous Conversation</h3>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Automatski nastavi slušati</div>
+        <div class="toggle-desc">Nakon što Jarvis odgovori, mikrofon se sam ponovno uključi nekoliko sekundi za brzi nastavak. Isključi se automatski dok je Wake Word uključen (taj već stalno sluša).</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="continuousConvToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="info-note">
+      Dodatno: dok Jarvis govori, tapni mikrofon da ga prekineš odmah — nema potrebe čekati da završi rečenicu.
+    </div>
+
     <h3>Reminders</h3>
     <div id="remindersList" class="reminders-list"></div>
     <div class="info-note">
@@ -780,6 +805,23 @@
       Aktiviraj glasom: "Jarvise, pokreni protokol [ime]". Prompt može biti složena rečenica — Jarvis će sam iskoristiti kalendar, pretragu ili druge alate ako zatreba.
     </div>
 
+    <h3>Contacts</h3>
+    <div id="contactsList" class="reminders-list"></div>
+    <div class="field">
+      <label>Contact Name</label>
+      <input type="text" id="contactNameInput" placeholder="npr. Marko">
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="tel" id="contactPhoneInput" placeholder="+385912345678">
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" type="button" id="addContactBtn">Add Contact</button>
+    </div>
+    <div class="info-note">
+      Koristi se za "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
+    </div>
+
     <h3>Personality</h3>
     <div class="field">
       <label>Ton odgovora</label>
@@ -787,6 +829,26 @@
       <div class="slider-labels">
         <span>Profesionalan</span><span>Balansiran</span><span>Sarkastičan</span>
       </div>
+    </div>
+
+    <h3>Memory</h3>
+    <div class="field">
+      <label>Pamti podatke unazad</label>
+      <select id="memoryRetentionSelect">
+        <option value="7">7 dana</option>
+        <option value="30">30 dana</option>
+        <option value="90">90 dana</option>
+        <option value="365">365 dana</option>
+        <option value="0">Zauvijek</option>
+      </select>
+      <div class="field-hint">Stavke starije od odabranog broja dana se automatski zaboravljaju.</div>
+    </div>
+    <div id="memoriesList" class="reminders-list"></div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-danger" type="button" id="resetMemoriesBtn">Reset Memory</button>
+    </div>
+    <div class="info-note">
+      Jarvis sam pamti bitne stvari koje spomeneš (posao, preferencije, alergije...) i koristi ih u budućim razgovorima. "Reset Memory" briše sve odmah, neovisno o postavci dana.
     </div>
 
     <h3>Boot Sequence</h3>
@@ -818,6 +880,35 @@
     </div>
     <div class="info-note">
       Okine se jednom po kalendarskom danu, pri prvom otvaranju aplikacije taj dan (bilo koje doba dana).
+    </div>
+
+    <h3>Expenses</h3>
+    <div id="expensesSummary" class="usage-table"></div>
+    <div id="expensesList" class="reminders-list"></div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-danger" type="button" id="clearExpensesBtn">Clear Expenses</button>
+    </div>
+    <div class="info-note">
+      Automatski se popunjava kad skeniraš račun (dugi pritisak na 📷 → dokument mod). Pitaj i glasom: "koliko sam potrošio ovaj mjesec".
+    </div>
+
+    <h3>Usage</h3>
+    <div id="usageStatsTable" class="usage-table"></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" type="button" id="resetUsageBtn">Reset Usage Stats</button>
+    </div>
+    <div class="info-note">
+      Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio, Groq Console...).
+    </div>
+
+    <h3>Backup</h3>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" type="button" id="exportBackupBtn">Export Backup</button>
+      <button class="btn btn-secondary" type="button" id="importBackupBtn">Import Backup</button>
+    </div>
+    <input type="file" id="importBackupFile" accept="application/json" style="display:none;">
+    <div class="info-note">
+      Backup uključuje razgovor, pamćenje, protokole, kontakte, troškove i podsjetnike — NE uključuje API ključeve (njih upiši ručno nakon vraćanja, iz sigurnosnih razloga).
     </div>
 
     <h3>Language & Voice</h3>
@@ -902,9 +993,12 @@ Tools available:
 - get_calendar_events — the user asks what's on their calendar or schedule for some day/range
 - create_calendar_event — the user asks to schedule, book, or add something to their calendar
 - web_search — call this whenever the answer depends on current, real-time, or very recent information (news, prices, scores, "who is currently...", or any fact you're not fully certain about). Don't guess when a quick search would confirm it.
+- remember_fact — the user shares something personal worth remembering long-term (job, preferences, allergies, ongoing projects, family). Skip trivial one-off details.
+- send_message — the user asks to send a text/SMS/WhatsApp message to a saved contact. You only open a pre-filled message card; the user taps to actually send it.
+- get_expense_summary — the user asks about spending or expenses tracked from scanned receipts.
 
 For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
-For action tools (set_reminder/calendar/web_search): call directly, then briefly summarize the result in speech.`;
+For action tools (set_reminder/calendar/web_search/remember_fact/send_message/get_expense_summary): call directly, then briefly summarize the result in speech.`;
 
   const PERSONALITY_LINES = [
     'Tone override: strictly professional and formal. No jokes, no irony, minimal small talk — efficient and businesslike at all times.',
@@ -912,10 +1006,22 @@ For action tools (set_reminder/calendar/web_search): call directly, then briefly
     "Tone override: sharp, dry, sarcastic wit — like Tony Stark's JARVIS gently teasing him. Add a clever quip or light jab where it fits naturally, but never let sarcasm get in the way of actually being helpful.",
   ];
 
+  function getActiveMemories() {
+    const days = state.memoryRetentionDays;
+    if (!days || days <= 0) return state.memories; // 0 = "forever", no filtering
+    const cutoff = Date.now() - days * 24 * 3600 * 1000;
+    return state.memories.filter(m => m.timestamp >= cutoff);
+  }
+
   function buildSystemPrompt() {
     const personalityLine = PERSONALITY_LINES[state.personality] ?? PERSONALITY_LINES[1];
+    const activeMemories = getActiveMemories();
+    const memoryBlock = activeMemories.length
+      ? `\n\nThings you remember about the user from past conversations:\n${activeMemories.map(m => `- ${m.fact}`).join('\n')}`
+      : '';
     return SYSTEM_PROMPT_BASE
       + `\n\n${personalityLine}`
+      + memoryBlock
       + `\n\nCurrent date and time (use this to resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm"): ${new Date().toString()}`;
   }
 
@@ -933,6 +1039,10 @@ FIELDS:
 Label: value
 Label: value
 (one line per field you can confidently read — vendor/name, date, total/amount with currency, invoice number, phone, email, etc. Omit fields you can't read. Don't guess.)
+RECEIPT: <yes or no — is this specifically a purchase receipt or invoice with a clear total amount?>
+AMOUNT: <numeric total only, no currency symbol or thousands separators, e.g. 45.90 — omit this line entirely if RECEIPT is no or the amount is unclear>
+CURRENCY: <3-letter currency code, e.g. EUR, USD — omit if unclear>
+CATEGORY: <one word spending category guess, e.g. Groceries, Fuel, Restaurant, Shopping, Utilities, Transport, Health — omit if RECEIPT is no>
 
 Reply in the same language the user used, or Croatian if unclear. No markdown, no extra commentary outside this format.`;
 
@@ -1023,6 +1133,40 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         },
         required: ['query']
       }
+    },
+    {
+      name: 'remember_fact',
+      description: 'Store a fact about the user to recall in future conversations — job, preferences, allergies, family, ongoing projects. Use whenever the user shares something personal worth remembering long-term. Do not use for trivial one-off details.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          fact: { type: 'string', description: 'A short, self-contained statement of the fact (e.g. "Works as a software engineer at Acme Corp", "Allergic to peanuts").' }
+        },
+        required: ['fact']
+      }
+    },
+    {
+      name: 'send_message',
+      description: "Open a pre-filled SMS or WhatsApp message card for the user to review and send themselves. Use when the user asks to send a text/SMS/WhatsApp message to someone in their saved contacts. You never send anything directly — the user always taps to confirm.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          contact_name: { type: 'string', description: 'Name of the contact as the user referred to them.' },
+          message: { type: 'string', description: 'The message text to pre-fill.' },
+          channel: { type: 'string', enum: ['sms', 'whatsapp'], description: 'Which app to open. Default to sms unless the user specifically says WhatsApp.' }
+        },
+        required: ['contact_name', 'message']
+      }
+    },
+    {
+      name: 'get_expense_summary',
+      description: "Get a summary of the user's tracked expenses (extracted from scanned receipts). Use when asked about spending, expenses, or how much they've spent.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          period: { type: 'string', enum: ['this_month', 'last_month', 'all_time'], description: 'Which period to summarize. Default this_month.' }
+        }
+      }
     }
   ];
 
@@ -1055,6 +1199,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       });
       if (!res.ok) throw await httpError(res, 'Anthropic');
       const data = await res.json();
+      trackUsage('anthropic', data.usage?.input_tokens, data.usage?.output_tokens);
       // Already in internal format — return blocks + stop_reason
       return {
         content: data.content,
@@ -1114,6 +1259,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       });
       if (!res.ok) throw await httpError(res, 'Gemini');
       const data = await res.json();
+      trackUsage('gemini', data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount);
       return geminiParseResponse(data);
     }
   };
@@ -1207,6 +1353,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         });
         if (!res.ok) throw await httpError(res, label);
         const data = await res.json();
+        trackUsage(name, data.usage?.prompt_tokens, data.usage?.completion_tokens);
         return openAIParseResponse(data);
       }
     };
@@ -1372,6 +1519,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     morningBriefingPrompt: localStorage.getItem('jarvis_morning_prompt') || 'Daj mi kratki jutarnji pregled: što imam u kalendaru danas i jedna zanimljiva vijest iz svijeta. Budi kratak.',
     // Protocols (named sequences the user defines; loaded below)
     protocols: [],
+    // Continuous conversation (auto re-listen after a response)
+    continuousConversation: localStorage.getItem('jarvis_continuous_conv') === 'true',
+    // Memory (facts remembered across sessions; loaded below)
+    memories: [],
+    memoryRetentionDays: parseInt(localStorage.getItem('jarvis_memory_retention') || '30', 10),
+    // Contacts (name -> phone, for send_message tool; loaded below)
+    contacts: [],
+    // Expenses (extracted from scanned receipts; loaded below)
+    expenses: [],
+    // Usage stats (real token/request counts from API responses; loaded below)
+    usageStats: null,
     // Runtime
     history: [],
     recognition: null,
@@ -1387,6 +1545,32 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   try {
     state.protocols = JSON.parse(localStorage.getItem('jarvis_protocols') || '[]');
   } catch { state.protocols = []; }
+
+  try {
+    state.memories = JSON.parse(localStorage.getItem('jarvis_memories') || '[]');
+  } catch { state.memories = []; }
+
+  try {
+    state.contacts = JSON.parse(localStorage.getItem('jarvis_contacts') || '[]');
+  } catch { state.contacts = []; }
+
+  try {
+    state.expenses = JSON.parse(localStorage.getItem('jarvis_expenses') || '[]');
+  } catch { state.expenses = []; }
+
+  {
+    const USAGE_DEFAULTS = {
+      anthropic: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      gemini: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      groq: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      openrouter: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      elevenlabs: { requests: 0, characters: 0 },
+      tavily: { requests: 0 },
+    };
+    try {
+      state.usageStats = { ...USAGE_DEFAULTS, ...JSON.parse(localStorage.getItem('jarvis_usage_stats') || '{}') };
+    } catch { state.usageStats = USAGE_DEFAULTS; }
+  }
 
   // Load history separately with try/catch
   try {
@@ -1596,11 +1780,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
 
   function updateMic() {
     micBtn.dataset.active = state.recognizing ? 'true' : 'false';
-    micBtn.disabled = state.processing || state.speaking || state.cameraActive;
+    micBtn.disabled = state.processing || state.cameraActive; // stays enabled while speaking so it can interrupt
     const camBtn = $('cameraBtn');
     if (camBtn) camBtn.disabled = state.processing || state.speaking || state.recognizing || state.cameraActive;
     if (state.processing) micHint.textContent = 'Thinking...';
-    else if (state.speaking) micHint.textContent = 'Speaking...';
+    else if (state.speaking) micHint.textContent = 'Speaking — tap to interrupt';
     else if (state.cameraActive) micHint.textContent = 'Camera active...';
     else if (state.recognizing) micHint.textContent = 'Listening — tap to stop';
     else micHint.textContent = 'Tap to speak';
@@ -1880,6 +2064,325 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   }
 
   // ==================================================================
+  // MEMORY (facts remembered across sessions, with a retention window)
+  // ==================================================================
+  function loadMemories() {
+    try { return JSON.parse(localStorage.getItem('jarvis_memories') || '[]'); } catch { return []; }
+  }
+  function saveMemories(list) {
+    try { localStorage.setItem('jarvis_memories', JSON.stringify(list)); } catch {}
+  }
+  function addMemory(fact) {
+    const list = loadMemories();
+    const clean = fact.trim();
+    if (!clean) return;
+    if (list.some(m => m.fact.trim().toLowerCase() === clean.toLowerCase())) return; // avoid exact duplicates
+    list.push({ id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, fact: clean, timestamp: Date.now() });
+    saveMemories(list);
+    state.memories = list;
+    renderMemoriesInSettings();
+  }
+  function removeMemory(id) {
+    const list = loadMemories().filter(m => m.id !== id);
+    saveMemories(list);
+    state.memories = list;
+    renderMemoriesInSettings();
+  }
+  function resetAllMemories() {
+    saveMemories([]);
+    state.memories = [];
+    renderMemoriesInSettings();
+  }
+  function pruneExpiredMemories() {
+    const days = state.memoryRetentionDays;
+    if (!days || days <= 0) return; // "forever" — nothing to prune
+    const cutoff = Date.now() - days * 24 * 3600 * 1000;
+    const before = state.memories.length;
+    state.memories = state.memories.filter(m => m.timestamp >= cutoff);
+    if (state.memories.length !== before) saveMemories(state.memories);
+  }
+  function renderMemoriesInSettings() {
+    const container = $('memoriesList');
+    if (!container) return;
+    const list = [...state.memories].sort((a, b) => b.timestamp - a.timestamp);
+    if (!list.length) {
+      container.innerHTML = '<div class="reminders-empty">Jarvis još ništa ne pamti.</div>';
+      return;
+    }
+    container.innerHTML = list.map(m => {
+      const dateStr = new Date(m.timestamp).toLocaleDateString();
+      return `<div class="reminder-item">
+        <div><div>${escapeHtml(m.fact)}</div><div class="reminder-time">${dateStr}</div></div>
+        <button data-id="${m.id}" class="reminder-delete" type="button">×</button>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.reminder-delete').forEach(btn => {
+      btn.addEventListener('click', () => removeMemory(btn.dataset.id));
+    });
+  }
+
+  // ==================================================================
+  // CONTACTS (for the send_message tool)
+  // ==================================================================
+  function loadContacts() {
+    try { return JSON.parse(localStorage.getItem('jarvis_contacts') || '[]'); } catch { return []; }
+  }
+  function saveContacts(list) {
+    try { localStorage.setItem('jarvis_contacts', JSON.stringify(list)); } catch {}
+  }
+  function addContact(name, phone) {
+    const list = loadContacts();
+    list.push({ id: `contact_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), phone: phone.trim() });
+    saveContacts(list);
+    state.contacts = list;
+    renderContactsInSettings();
+  }
+  function removeContact(id) {
+    const list = loadContacts().filter(c => c.id !== id);
+    saveContacts(list);
+    state.contacts = list;
+    renderContactsInSettings();
+  }
+  function renderContactsInSettings() {
+    const container = $('contactsList');
+    if (!container) return;
+    const list = state.contacts;
+    if (!list.length) {
+      container.innerHTML = '<div class="reminders-empty">Nema spremljenih kontakata.</div>';
+      return;
+    }
+    container.innerHTML = list.map(c => `
+      <div class="reminder-item">
+        <div><div>${escapeHtml(c.name)}</div><div class="reminder-time">${escapeHtml(c.phone)}</div></div>
+        <button data-id="${c.id}" class="reminder-delete" type="button">×</button>
+      </div>`).join('');
+    container.querySelectorAll('.reminder-delete').forEach(btn => {
+      btn.addEventListener('click', () => removeContact(btn.dataset.id));
+    });
+  }
+  function findContactByName(name) {
+    const n = name.toLowerCase().trim();
+    return state.contacts.find(c => c.name.toLowerCase() === n)
+      || state.contacts.find(c => c.name.toLowerCase().includes(n) || n.includes(c.name.toLowerCase()));
+  }
+  function buildMessageUrl(phone, message, channel) {
+    const encodedMsg = encodeURIComponent(message);
+    if (channel === 'whatsapp') {
+      const digits = phone.replace(/[^\d+]/g, '').replace(/^\+/, '');
+      return `https://wa.me/${digits}?text=${encodedMsg}`;
+    }
+    return `sms:${phone}?body=${encodedMsg}`;
+  }
+
+  // ==================================================================
+  // EXPENSES (extracted from scanned receipts in document mode)
+  // ==================================================================
+  function loadExpenses() {
+    try { return JSON.parse(localStorage.getItem('jarvis_expenses') || '[]'); } catch { return []; }
+  }
+  function saveExpenses(list) {
+    try { localStorage.setItem('jarvis_expenses', JSON.stringify(list)); } catch {}
+  }
+  function addExpense(amount, currency, category, note) {
+    if (!(amount > 0)) return;
+    const list = loadExpenses();
+    list.push({
+      id: `exp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      amount, currency: currency || '', category: category || 'Ostalo', note: note || '',
+      timestamp: Date.now(),
+    });
+    saveExpenses(list);
+    state.expenses = list;
+    renderExpensesInSettings();
+  }
+  function removeExpense(id) {
+    const list = loadExpenses().filter(e => e.id !== id);
+    saveExpenses(list);
+    state.expenses = list;
+    renderExpensesInSettings();
+  }
+  function renderExpensesInSettings() {
+    const summaryEl = $('expensesSummary');
+    const listEl = $('expensesList');
+    if (!summaryEl || !listEl) return;
+    const list = [...state.expenses].sort((a, b) => b.timestamp - a.timestamp);
+
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
+    const thisMonth = list.filter(e => {
+      const d = new Date(e.timestamp);
+      return `${d.getFullYear()}-${d.getMonth()}` === monthKey;
+    });
+    const byCategory = {};
+    let total = 0, currency = '';
+    thisMonth.forEach(e => {
+      byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
+      total += e.amount;
+      if (e.currency) currency = e.currency;
+    });
+    const catRows = Object.entries(byCategory).map(([cat, amt]) =>
+      `<div class="usage-row"><span class="usage-name">${escapeHtml(cat)}</span><span class="usage-numbers">${amt.toFixed(2)} ${currency}</span></div>`
+    ).join('');
+    summaryEl.innerHTML = thisMonth.length
+      ? catRows + `<div class="usage-row"><span class="usage-name">UKUPNO (mjesec)</span><span class="usage-numbers">${total.toFixed(2)} ${currency}</span></div>`
+      : '<div class="reminders-empty">Nema troškova ovaj mjesec.</div>';
+
+    listEl.innerHTML = list.length
+      ? list.slice(0, 20).map(e => {
+          const dateStr = new Date(e.timestamp).toLocaleDateString();
+          return `<div class="reminder-item">
+            <div><div>${e.amount.toFixed(2)} ${e.currency} — ${escapeHtml(e.category)}</div><div class="reminder-time">${dateStr}</div></div>
+            <button data-id="${e.id}" class="reminder-delete" type="button">×</button>
+          </div>`;
+        }).join('')
+      : '';
+    listEl.querySelectorAll('.reminder-delete').forEach(btn => {
+      btn.addEventListener('click', () => removeExpense(btn.dataset.id));
+    });
+  }
+  function getExpenseSummary(period) {
+    const now = new Date();
+    let filtered = state.expenses;
+    if (period === 'last_month') {
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      filtered = state.expenses.filter(e => {
+        const d = new Date(e.timestamp);
+        return d.getFullYear() === lm.getFullYear() && d.getMonth() === lm.getMonth();
+      });
+    } else if (period !== 'all_time') {
+      filtered = state.expenses.filter(e => {
+        const d = new Date(e.timestamp);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      });
+    }
+    if (!filtered.length) return 'No tracked expenses found for that period.';
+    const byCategory = {};
+    let total = 0, currency = '';
+    filtered.forEach(e => {
+      byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
+      total += e.amount;
+      if (e.currency) currency = e.currency;
+    });
+    const breakdown = Object.entries(byCategory).map(([c, a]) => `${c}: ${a.toFixed(2)} ${currency}`).join(', ');
+    return `Total: ${total.toFixed(2)} ${currency}. Breakdown: ${breakdown}.`;
+  }
+
+  // ==================================================================
+  // USAGE TRACKING (real token/request counts parsed from API responses)
+  // ==================================================================
+  function saveUsageStats() {
+    try { localStorage.setItem('jarvis_usage_stats', JSON.stringify(state.usageStats)); } catch {}
+  }
+  function trackUsage(provider, inputTokens, outputTokens) {
+    if (!state.usageStats[provider]) state.usageStats[provider] = { requests: 0, inputTokens: 0, outputTokens: 0 };
+    state.usageStats[provider].requests++;
+    state.usageStats[provider].inputTokens = (state.usageStats[provider].inputTokens || 0) + (inputTokens || 0);
+    state.usageStats[provider].outputTokens = (state.usageStats[provider].outputTokens || 0) + (outputTokens || 0);
+    saveUsageStats();
+  }
+  function trackSimpleUsage(provider, extra) {
+    if (!state.usageStats[provider]) state.usageStats[provider] = { requests: 0 };
+    state.usageStats[provider].requests++;
+    if (extra) {
+      for (const k in extra) {
+        state.usageStats[provider][k] = (state.usageStats[provider][k] || 0) + extra[k];
+      }
+    }
+    saveUsageStats();
+  }
+  function resetUsageStats() {
+    state.usageStats = {
+      anthropic: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      gemini: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      groq: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      openrouter: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      elevenlabs: { requests: 0, characters: 0 },
+      tavily: { requests: 0 },
+    };
+    saveUsageStats();
+    renderUsageStats();
+  }
+  function formatTokens(n) {
+    n = n || 0;
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+  }
+  function renderUsageStats() {
+    const container = $('usageStatsTable');
+    if (!container) return;
+    const s = state.usageStats;
+    const rows = [];
+    const addRow = (name, requests, detail) => {
+      if (!requests) return; // skip providers never used
+      rows.push(`<div class="usage-row"><span class="usage-name">${name}</span><span class="usage-numbers">${requests}× ${detail || ''}</span></div>`);
+    };
+    addRow('Claude', s.anthropic.requests, `${formatTokens(s.anthropic.inputTokens)} in / ${formatTokens(s.anthropic.outputTokens)} out`);
+    addRow('Gemini', s.gemini.requests, `${formatTokens(s.gemini.inputTokens)} in / ${formatTokens(s.gemini.outputTokens)} out`);
+    addRow('Groq', s.groq.requests, `${formatTokens(s.groq.inputTokens)} in / ${formatTokens(s.groq.outputTokens)} out`);
+    addRow('OpenRouter', s.openrouter.requests, `${formatTokens(s.openrouter.inputTokens)} in / ${formatTokens(s.openrouter.outputTokens)} out`);
+    addRow('ElevenLabs', s.elevenlabs.requests, `${(s.elevenlabs.characters || 0).toLocaleString()} znakova`);
+    addRow('Tavily', s.tavily.requests, '');
+    container.innerHTML = rows.length ? rows.join('') : '<div class="reminders-empty">Još nema podataka o korištenju.</div>';
+  }
+
+  // ==================================================================
+  // BACKUP / EXPORT / IMPORT
+  // ==================================================================
+  function exportBackup() {
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      history: state.history,
+      memories: state.memories,
+      protocols: state.protocols,
+      contacts: state.contacts,
+      expenses: state.expenses,
+      reminders: loadReminders(),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jarvis-backup-${localDateStamp()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function importBackupFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || typeof data !== 'object') throw new Error('Invalid file');
+        if (Array.isArray(data.history)) { state.history = data.history; persistHistory(); }
+        if (Array.isArray(data.memories)) { state.memories = data.memories; saveMemories(state.memories); }
+        if (Array.isArray(data.protocols)) { state.protocols = data.protocols; saveProtocols(state.protocols); }
+        if (Array.isArray(data.contacts)) { state.contacts = data.contacts; saveContacts(state.contacts); }
+        if (Array.isArray(data.expenses)) { state.expenses = data.expenses; saveExpenses(state.expenses); renderExpensesInSettings(); }
+        if (Array.isArray(data.reminders)) {
+          saveReminders(data.reminders);
+          data.reminders.forEach(r => { if (r.fireAt > Date.now()) scheduleReminderTimer(r); });
+        }
+        renderMemoriesInSettings();
+        renderProtocolsInSettings();
+        renderContactsInSettings();
+        renderRemindersInSettings();
+        transcript.innerHTML = '<div class="empty-hint" id="emptyHint">Tap microphone to begin</div>';
+        rehydrateHistory();
+        closeSettings();
+        const lang = state.lang === 'auto' ? state.currentLang : state.lang;
+        addMessage('assistant', isHr(lang) ? 'Backup je uspješno vraćen.' : 'Backup restored successfully.');
+      } catch (e) {
+        addMessage('error', `Import failed: ${e.message}`);
+      }
+    };
+    reader.onerror = () => addMessage('error', 'Failed to read backup file.');
+    reader.readAsText(file);
+  }
+
+  // ==================================================================
   // GOOGLE CALENDAR (client-side OAuth via Google Identity Services)
   // ==================================================================
   let googleTokenClient = null;
@@ -1988,6 +2491,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     });
     if (!res.ok) throw await httpError(res, 'Tavily');
     const data = await res.json();
+    trackSimpleUsage('tavily');
     let summary = '';
     if (data.answer) summary += data.answer + '\n\n';
     if (Array.isArray(data.results)) {
@@ -2018,6 +2522,25 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         }
         case 'web_search':
           return await performWebSearch(toolUse.input.query);
+        case 'remember_fact':
+          addMemory(toolUse.input.fact);
+          return 'Fact stored.';
+        case 'send_message': {
+          const contact = findContactByName(toolUse.input.contact_name);
+          if (!contact) {
+            return `Contact "${toolUse.input.contact_name}" not found in saved contacts. Tell the user to add this contact in Settings, or ask for the phone number.`;
+          }
+          const channel = toolUse.input.channel === 'whatsapp' ? 'whatsapp' : 'sms';
+          const url = buildMessageUrl(contact.phone, toolUse.input.message, channel);
+          renderLinkCard({
+            url,
+            title: `${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}: ${contact.name}`,
+            description: toolUse.input.message.length > 50 ? toolUse.input.message.slice(0, 50) + '…' : toolUse.input.message,
+          });
+          return `Message card shown for ${contact.name}. The user still needs to tap it and confirm send themselves.`;
+        }
+        case 'get_expense_summary':
+          return getExpenseSummary(toolUse.input.period);
         default: return 'Unknown tool.';
       }
     } catch (e) {
@@ -2427,10 +2950,22 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       const fieldsBlock = raw.slice(fieldsIdx).replace(/FIELDS:/i, '');
       fieldsBlock.split('\n').forEach(line => {
         const m = line.match(/^\s*([^:]{1,40}):\s*(.+?)\s*$/);
-        if (m) fields.push({ label: m[1].trim(), value: m[2].trim() });
+        if (m && !/^(RECEIPT|AMOUNT|CURRENCY|CATEGORY)$/i.test(m[1].trim())) {
+          fields.push({ label: m[1].trim(), value: m[2].trim() });
+        }
       });
     }
-    return { spoken, fields };
+    const receiptMatch = raw.match(/RECEIPT:\s*(yes|no|da|ne)/i);
+    const isReceipt = receiptMatch ? /^(yes|da)$/i.test(receiptMatch[1]) : false;
+    const amountMatch = raw.match(/AMOUNT:\s*([\d.,]+)/i);
+    const currencyMatch = raw.match(/CURRENCY:\s*([A-Z]{3})/i);
+    const categoryMatch = raw.match(/CATEGORY:\s*(.+)/i);
+    const receipt = (isReceipt && amountMatch) ? {
+      amount: parseFloat(amountMatch[1].replace(',', '.')),
+      currency: currencyMatch ? currencyMatch[1].toUpperCase() : '',
+      category: categoryMatch ? categoryMatch[1].trim() : 'Ostalo',
+    } : null;
+    return { spoken, fields, receipt };
   }
 
   function renderDocumentCard(fields) {
@@ -2480,6 +3015,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     });
     if (!res.ok) throw await httpError(res, 'Anthropic');
     const data = await res.json();
+    trackUsage('anthropic', data.usage?.input_tokens, data.usage?.output_tokens);
     return (data.content || []).map(b => b.text || '').join(' ').trim();
   }
 
@@ -2502,6 +3038,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     });
     if (!res.ok) throw await httpError(res, 'Gemini');
     const data = await res.json();
+    trackUsage('gemini', data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount);
     const parts = data.candidates?.[0]?.content?.parts || [];
     return parts.map(p => p.text || '').join(' ').trim();
   }
@@ -2545,8 +3082,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     try {
       if (mode === 'document') {
         const raw = await describeDocument(base64, spokenText, lang);
-        const { spoken, fields } = parseDocumentResponse(raw);
+        const { spoken, fields, receipt } = parseDocumentResponse(raw);
         renderDocumentCard(fields);
+        if (receipt) addExpense(receipt.amount, receipt.currency, receipt.category, spoken);
         state.processing = false;
         addMessage('assistant', spoken);
         state.history.push({ role: 'user', content: (spokenText && spokenText.trim()) || (isHr(lang) ? 'Skenirao sam dokument.' : 'I scanned a document.') });
@@ -2580,16 +3118,33 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ==================================================================
   // TEXT TO SPEECH
   // ==================================================================
+  // Handle to the currently playing speech so it can be interrupted cleanly.
+  // stop() always resolves the pending speak promise — nothing is left hanging.
+  let currentSpeech = null;
+  let speechInterrupted = false;
+  let listenAfterInterrupt = false;
+
+  function interruptSpeech(opts = {}) {
+    if (!state.speaking) return;
+    speechInterrupted = true;
+    listenAfterInterrupt = !!opts.listenAfter;
+    if (currentSpeech) { try { currentSpeech.stop(); } catch {} }
+  }
+
   async function speak(text, lang) {
     if (!text || !text.trim()) return;
+    speechInterrupted = false;
+    listenAfterInterrupt = false;
     state.speaking = true; setState('speaking'); updateMic();
     try {
       if (state.elevenKey) {
         try {
           await speakEleven(text);
         } catch (e) {
-          addMessage('error', `ElevenLabs: ${e.message} — falling back to system voice.`);
-          try { await speakWeb(text, lang); } catch {}
+          if (!speechInterrupted) {
+            addMessage('error', `ElevenLabs: ${e.message} — falling back to system voice.`);
+            try { await speakWeb(text, lang); } catch {}
+          }
         }
       } else {
         await speakWeb(text, lang);
@@ -2597,36 +3152,74 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     } catch (e) {
       console.warn('Voice failed', e);
     } finally {
+      currentSpeech = null;
       state.speaking = false; setState('idle'); updateMic();
-      resumeWakeWordIfEnabled();
+
+      if (speechInterrupted && listenAfterInterrupt) {
+        // User tapped the mic mid-sentence — they want to talk now.
+        setTimeout(() => startListening(), 150);
+      } else if (!speechInterrupted && state.continuousConversation && !state.wakeWordEnabled) {
+        // Continuous conversation: reopen the mic briefly for a follow-up.
+        // Web Speech ends on its own after a few seconds of silence, so this can't loop.
+        setTimeout(() => {
+          if (!state.recognizing && !state.processing && !state.speaking && !state.cameraActive) startListening();
+        }, 400);
+      } else {
+        resumeWakeWordIfEnabled();
+      }
+      speechInterrupted = false;
+      listenAfterInterrupt = false;
     }
   }
 
   async function speakEleven(text) {
-    const res = await fetch(`${ELEVEN_API}/${state.elevenVoice}?output_format=mp3_44100_128`, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': state.elevenKey,
-        'Content-Type': 'application/json',
-        'Accept': 'audio/mpeg',
+    const controller = new AbortController();
+    let audio = null, url = null, settle = null;
+    const cleanup = () => { if (url) { URL.revokeObjectURL(url); url = null; } };
+
+    currentSpeech = {
+      stop: () => {
+        controller.abort();
+        if (audio) { try { audio.pause(); } catch {} }
+        cleanup();
+        if (settle) settle();
       },
-      body: JSON.stringify({
-        text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true },
-      }),
-    });
+    };
+
+    let res;
+    try {
+      res = await fetch(`${ELEVEN_API}/${state.elevenVoice}?output_format=mp3_44100_128`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'xi-api-key': state.elevenKey,
+          'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg',
+        },
+        body: JSON.stringify({
+          text,
+          model_id: 'eleven_multilingual_v2',
+          voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.35, use_speaker_boost: true },
+        }),
+      });
+    } catch (e) {
+      if (speechInterrupted) return; // aborted by user — not an error
+      throw e;
+    }
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`ElevenLabs ${res.status}: ${err.slice(0, 120)}`);
     }
+    trackSimpleUsage('elevenlabs', { characters: text.length });
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    if (speechInterrupted) return;
+    url = URL.createObjectURL(blob);
     return new Promise((resolve, reject) => {
-      const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
-      audio.play().catch(reject);
+      settle = resolve;
+      audio = new Audio(url);
+      audio.onended = () => { cleanup(); resolve(); };
+      audio.onerror = (e) => { cleanup(); speechInterrupted ? resolve() : reject(e); };
+      audio.play().catch((e) => { cleanup(); speechInterrupted ? resolve() : reject(e); });
     });
   }
 
@@ -2646,7 +3239,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         candidates.find(v => /Google/i.test(v.name)) ||
         candidates[0];
       if (pick) u.voice = pick;
-      u.onend = resolve; u.onerror = resolve;
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      currentSpeech = { stop: () => { try { window.speechSynthesis.cancel(); } catch {} finish(); } };
+      u.onend = finish; u.onerror = finish;
       window.speechSynthesis.speak(u);
     });
   }
@@ -2697,6 +3293,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
 
     $('personalitySlider').value = state.personality;
     $('bootSequenceToggle').checked = state.bootSequenceEnabled;
+    $('continuousConvToggle').checked = state.continuousConversation;
+    $('memoryRetentionSelect').value = String(state.memoryRetentionDays);
     $('morningBriefingToggle').checked = state.morningBriefingEnabled;
     $('morningBriefingPrompt').value = state.morningBriefingPrompt;
 
@@ -2709,6 +3307,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     updateGoogleConnectionStatus();
     renderRemindersInSettings();
     renderProtocolsInSettings();
+    renderMemoriesInSettings();
+    renderContactsInSettings();
+    renderExpensesInSettings();
+    renderUsageStats();
 
     $('settingsModal').dataset.open = 'true';
   }
@@ -2736,6 +3338,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     state.tavilyKey = $('tavilyKey').value.trim();
 
     state.personality = parseInt($('personalitySlider').value, 10);
+    state.continuousConversation = $('continuousConvToggle').checked;
+    state.memoryRetentionDays = parseInt($('memoryRetentionSelect').value, 10);
     state.bootSequenceEnabled = $('bootSequenceToggle').checked;
     state.morningBriefingEnabled = $('morningBriefingToggle').checked;
     state.morningBriefingPrompt = $('morningBriefingPrompt').value.trim() || state.morningBriefingPrompt;
@@ -2764,6 +3368,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     localStorage.setItem('jarvis_tavily_key', state.tavilyKey);
 
     localStorage.setItem('jarvis_personality', String(state.personality));
+    localStorage.setItem('jarvis_continuous_conv', String(state.continuousConversation));
+    localStorage.setItem('jarvis_memory_retention', String(state.memoryRetentionDays));
+    pruneExpiredMemories(); // apply a shortened retention window immediately
     localStorage.setItem('jarvis_boot_sequence', String(state.bootSequenceEnabled));
     localStorage.setItem('jarvis_morning_briefing', String(state.morningBriefingEnabled));
     localStorage.setItem('jarvis_morning_prompt', state.morningBriefingPrompt);
@@ -2793,6 +3400,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       'jarvis_wake_word', 'jarvis_google_client_id', 'jarvis_tavily_key', 'jarvis_reminders',
       'jarvis_personality', 'jarvis_boot_sequence', 'jarvis_morning_briefing', 'jarvis_morning_prompt',
       'jarvis_last_briefing_date', 'jarvis_protocols',
+      'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
+      'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
       // Legacy keys from older versions
@@ -2867,7 +3476,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ==================================================================
   // WIRE UP
   // ==================================================================
-  micBtn.addEventListener('click', () => state.recognizing ? stopListening() : startListening());
+  micBtn.addEventListener('click', () => {
+    if (state.speaking) { interruptSpeech({ listenAfter: true }); return; }
+    state.recognizing ? stopListening() : startListening();
+  });
   (() => {
     let camPressTimer = null;
     let camLongPressTriggered = false;
@@ -2894,6 +3506,37 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   $('closeSettings').addEventListener('click', closeSettings);
   $('resetAll').addEventListener('click', resetAll);
   $('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
+  $('resetMemoriesBtn').addEventListener('click', () => {
+    if (!state.memories.length) return;
+    if (!confirm('Obrisati SVE što Jarvis pamti o tebi? Ovo se ne može poništiti.')) return;
+    resetAllMemories();
+  });
+  $('addContactBtn').addEventListener('click', () => {
+    const name = $('contactNameInput').value.trim();
+    const phone = $('contactPhoneInput').value.trim();
+    if (!name || !phone) return;
+    addContact(name, phone);
+    $('contactNameInput').value = '';
+    $('contactPhoneInput').value = '';
+  });
+  $('clearExpensesBtn').addEventListener('click', () => {
+    if (!state.expenses.length) return;
+    if (!confirm('Obrisati sve zabilježene troškove?')) return;
+    saveExpenses([]); state.expenses = []; renderExpensesInSettings();
+  });
+  $('resetUsageBtn').addEventListener('click', () => {
+    if (!confirm('Resetirati statistiku korištenja?')) return;
+    resetUsageStats();
+  });
+  $('exportBackupBtn').addEventListener('click', exportBackup);
+  $('importBackupBtn').addEventListener('click', () => $('importBackupFile').click());
+  $('importBackupFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      if (confirm('Vratiti backup? Trenutni razgovor, pamćenje, protokoli, kontakti, troškovi i podsjetnici bit će zamijenjeni.')) importBackupFile(file);
+    }
+    e.target.value = ''; // allow re-selecting the same file later
+  });
   $('addProtocolBtn').addEventListener('click', () => {
     const name = $('protocolNameInput').value.trim();
     const prompt = $('protocolPromptInput').value.trim();
@@ -2954,6 +3597,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // Resume any pending reminders from a previous session, and start
   // wake-word listening if it was left enabled.
   initReminders();
+  pruneExpiredMemories();
   if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
 
   // Boot sequence animation, or skip straight past it if disabled
