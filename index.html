@@ -293,8 +293,8 @@
   .reminder-item .reminder-time { color: var(--gold); font-size: 10px; margin-top: 2px; }
   .reminder-item button {
     background: transparent; border: 1px solid var(--red); color: var(--red);
-    width: 24px; height: 24px; border-radius: 3px; cursor: pointer;
-    flex-shrink: 0; margin-left: 8px; font-size: 14px; line-height: 1;
+    width: 18px; height: 18px; border-radius: 3px; cursor: pointer;
+    flex-shrink: 0; margin-left: 8px; font-size: 11px; line-height: 1; padding: 0;
   }
   .reminders-empty, .calendar-empty { color: var(--text-dim); font-size: 11px; padding: 6px 0; }
 
@@ -491,6 +491,45 @@
   .btn-danger { border-color: var(--red); color: var(--red); }
   .btn-danger:hover { background: var(--red); color: #000; }
 
+  /* Small destructive buttons (reset / clear / delete / import) */
+  .btn.btn-small-danger {
+    flex: 0 0 auto; padding: 6px 10px;
+    font-size: 9px; letter-spacing: 0.15em;
+    border-color: var(--red); color: var(--red); background: transparent;
+  }
+  .btn.btn-small-danger:hover, .btn.btn-small-danger:active { background: var(--red); color: #000; }
+  .btn-row.danger-row { justify-content: flex-end; }
+  .icon-btn.icon-btn-small {
+    width: 24px; height: 24px; font-size: 11px;
+    border-color: rgba(255, 77, 77, 0.4); color: var(--red);
+  }
+
+  /* Password confirmation modal */
+  .pw-backdrop {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(0, 3, 8, 0.9); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .pw-backdrop[data-open="true"] { display: flex; }
+  .pw-modal {
+    background: var(--bg); border: 1px solid var(--red);
+    box-shadow: 0 0 30px rgba(255, 77, 77, 0.3);
+    width: 100%; max-width: 320px; padding: 20px;
+  }
+  .pw-title {
+    font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 0.25em;
+    color: var(--red); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .pw-message { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 14px; }
+  .pw-modal input {
+    width: 100%; padding: 10px 12px;
+    background: rgba(255, 77, 77, 0.05); border: 1px solid rgba(255, 77, 77, 0.4);
+    color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 16px;
+    letter-spacing: 0.3em; outline: none;
+  }
+  .pw-modal input:focus { border-color: var(--red); }
+  .pw-error { color: var(--red); font-size: 11px; min-height: 16px; margin-top: 6px; }
+
   .warning {
     padding: 10px 12px;
     border: 1px solid rgba(255, 181, 71, 0.4);
@@ -567,7 +606,7 @@
       <span class="wake-badge" id="wakeBadge" style="display:none;">👂 WAKE</span>
     </div>
     <div class="topbar-right">
-      <button class="icon-btn" id="clearBtn" title="Clear conversation">⟲</button>
+      <button class="icon-btn icon-btn-small" id="clearBtn" title="Clear conversation">⟲</button>
       <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
     </div>
   </div>
@@ -844,8 +883,8 @@
       <div class="field-hint">Stavke starije od odabranog broja dana se automatski zaboravljaju.</div>
     </div>
     <div id="memoriesList" class="reminders-list"></div>
-    <div class="btn-row" style="margin-top:0;">
-      <button class="btn btn-danger" type="button" id="resetMemoriesBtn">Reset Memory</button>
+    <div class="btn-row danger-row" style="margin-top:0;">
+      <button class="btn btn-small-danger" type="button" id="resetMemoriesBtn">Reset Memory</button>
     </div>
     <div class="info-note">
       Jarvis sam pamti bitne stvari koje spomeneš (posao, preferencije, alergije...) i koristi ih u budućim razgovorima. "Reset Memory" briše sve odmah, neovisno o postavci dana.
@@ -885,8 +924,8 @@
     <h3>Expenses</h3>
     <div id="expensesSummary" class="usage-table"></div>
     <div id="expensesList" class="reminders-list"></div>
-    <div class="btn-row" style="margin-top:0;">
-      <button class="btn btn-danger" type="button" id="clearExpensesBtn">Clear Expenses</button>
+    <div class="btn-row danger-row" style="margin-top:0;">
+      <button class="btn btn-small-danger" type="button" id="clearExpensesBtn">Clear Expenses</button>
     </div>
     <div class="info-note">
       Automatski se popunjava kad skeniraš račun (dugi pritisak na 📷 → dokument mod). Pitaj i glasom: "koliko sam potrošio ovaj mjesec".
@@ -894,8 +933,8 @@
 
     <h3>Usage</h3>
     <div id="usageStatsTable" class="usage-table"></div>
-    <div class="btn-row" style="margin-top:8px;">
-      <button class="btn btn-secondary" type="button" id="resetUsageBtn">Reset Usage Stats</button>
+    <div class="btn-row danger-row" style="margin-top:8px;">
+      <button class="btn btn-small-danger" type="button" id="resetUsageBtn">Reset Usage Stats</button>
     </div>
     <div class="info-note">
       Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio, Groq Console...).
@@ -904,7 +943,7 @@
     <h3>Backup</h3>
     <div class="btn-row" style="margin-top:0;">
       <button class="btn" type="button" id="exportBackupBtn">Export Backup</button>
-      <button class="btn btn-secondary" type="button" id="importBackupBtn">Import Backup</button>
+      <button class="btn btn-small-danger" type="button" id="importBackupBtn">Import Backup</button>
     </div>
     <input type="file" id="importBackupFile" accept="application/json" style="display:none;">
     <div class="info-note">
@@ -952,8 +991,21 @@
       <button class="btn" id="saveSettings">Save</button>
       <button class="btn btn-secondary" id="closeSettings">Close</button>
     </div>
+    <div class="btn-row danger-row">
+      <button class="btn btn-small-danger" id="resetAll">Reset All Data</button>
+    </div>
+  </div>
+</div>
+
+<div class="pw-backdrop" id="pwModal">
+  <div class="pw-modal">
+    <div class="pw-title">⚠ Potvrda brisanja</div>
+    <div class="pw-message" id="pwMessage"></div>
+    <input type="password" id="pwInput" inputmode="numeric" autocomplete="off" placeholder="Lozinka">
+    <div class="pw-error" id="pwError"></div>
     <div class="btn-row">
-      <button class="btn btn-danger" id="resetAll">Reset All Data</button>
+      <button class="btn btn-secondary" type="button" id="pwCancel">Odustani</button>
+      <button class="btn btn-danger" type="button" id="pwConfirm">Potvrdi</button>
     </div>
   </div>
 </div>
@@ -1959,7 +2011,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       </div>`;
     }).join('');
     container.querySelectorAll('.reminder-delete').forEach(btn => {
-      btn.addEventListener('click', () => removeReminder(btn.dataset.id));
+      btn.addEventListener('click', async () => { if (await requirePassword('Obrisati ovaj podsjetnik?')) removeReminder(btn.dataset.id); });
     });
   }
 
@@ -2002,7 +2054,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       </div>`;
     }).join('');
     container.querySelectorAll('.reminder-delete').forEach(btn => {
-      btn.addEventListener('click', () => removeProtocol(btn.dataset.id));
+      btn.addEventListener('click', async () => { if (await requirePassword('Obrisati ovaj protokol?')) removeProtocol(btn.dataset.id); });
     });
   }
   function findProtocolByName(name) {
@@ -2117,7 +2169,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       </div>`;
     }).join('');
     container.querySelectorAll('.reminder-delete').forEach(btn => {
-      btn.addEventListener('click', () => removeMemory(btn.dataset.id));
+      btn.addEventListener('click', async () => { if (await requirePassword('Obrisati ovu stavku iz pamćenja?')) removeMemory(btn.dataset.id); });
     });
   }
 
@@ -2157,7 +2209,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         <button data-id="${c.id}" class="reminder-delete" type="button">×</button>
       </div>`).join('');
     container.querySelectorAll('.reminder-delete').forEach(btn => {
-      btn.addEventListener('click', () => removeContact(btn.dataset.id));
+      btn.addEventListener('click', async () => { if (await requirePassword('Obrisati ovaj kontakt?')) removeContact(btn.dataset.id); });
     });
   }
   function findContactByName(name) {
@@ -2237,7 +2289,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         }).join('')
       : '';
     listEl.querySelectorAll('.reminder-delete').forEach(btn => {
-      btn.addEventListener('click', () => removeExpense(btn.dataset.id));
+      btn.addEventListener('click', async () => { if (await requirePassword('Obrisati ovaj trošak?')) removeExpense(btn.dataset.id); });
     });
   }
   function getExpenseSummary(period) {
@@ -3388,8 +3440,43 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (wasWakeEnabled !== state.wakeWordEnabled) syncWakeWordListening();
   }
 
-  function resetAll() {
-    if (!confirm('Erase ALL API keys, conversation, and settings?')) return;
+  // ==================================================================
+  // PASSWORD CONFIRMATION FOR DESTRUCTIVE ACTIONS
+  // ==================================================================
+  // Guards against accidental taps. NOT real security: the code is public,
+  // so anyone reading it can see the password.
+  const DELETE_PASSWORD = '1234';
+  let pwResolver = null;
+
+  function requirePassword(message) {
+    return new Promise((resolve) => {
+      if (pwResolver) { const prev = pwResolver; pwResolver = null; prev(false); }
+      pwResolver = resolve;
+      $('pwMessage').textContent = message;
+      $('pwInput').value = '';
+      $('pwError').textContent = '';
+      $('pwModal').dataset.open = 'true';
+      setTimeout(() => { try { $('pwInput').focus(); } catch {} }, 50);
+    });
+  }
+  function closePasswordModal(result) {
+    $('pwModal').dataset.open = 'false';
+    $('pwInput').value = '';
+    const r = pwResolver; pwResolver = null;
+    if (r) r(result);
+  }
+  function submitPassword() {
+    if ($('pwInput').value === DELETE_PASSWORD) {
+      closePasswordModal(true);
+    } else {
+      $('pwError').textContent = 'Pogrešna lozinka.';
+      $('pwInput').value = '';
+      $('pwInput').focus();
+    }
+  }
+
+  async function resetAll() {
+    if (!(await requirePassword('Obrisati SVE: API ključeve, razgovor, pamćenje, kontakte, troškove i postavke? Ovo se ne može poništiti.'))) return;
     stopWakeWordListening();
     releaseWakeLock();
     const keysToRemove = [
@@ -3411,9 +3498,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     location.reload();
   }
 
-  function clearHistory() {
+  async function clearHistory() {
     if (!state.history.length) return;
-    if (!confirm('Clear current conversation?')) return;
+    if (!(await requirePassword('Obrisati trenutni razgovor s ekrana i iz povijesti?'))) return;
     state.history = [];
     localStorage.removeItem('jarvis_history');
     transcript.innerHTML = '<div class="empty-hint" id="emptyHint">Tap microphone to begin</div>';
@@ -3506,9 +3593,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   $('closeSettings').addEventListener('click', closeSettings);
   $('resetAll').addEventListener('click', resetAll);
   $('connectGoogleBtn').addEventListener('click', connectGoogleCalendar);
-  $('resetMemoriesBtn').addEventListener('click', () => {
+  $('resetMemoriesBtn').addEventListener('click', async () => {
     if (!state.memories.length) return;
-    if (!confirm('Obrisati SVE što Jarvis pamti o tebi? Ovo se ne može poništiti.')) return;
+    if (!(await requirePassword('Obrisati SVE što Jarvis pamti o tebi? Ovo se ne može poništiti.'))) return;
     resetAllMemories();
   });
   $('addContactBtn').addEventListener('click', () => {
@@ -3519,24 +3606,33 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     $('contactNameInput').value = '';
     $('contactPhoneInput').value = '';
   });
-  $('clearExpensesBtn').addEventListener('click', () => {
+  $('clearExpensesBtn').addEventListener('click', async () => {
     if (!state.expenses.length) return;
-    if (!confirm('Obrisati sve zabilježene troškove?')) return;
+    if (!(await requirePassword('Obrisati sve zabilježene troškove?'))) return;
     saveExpenses([]); state.expenses = []; renderExpensesInSettings();
   });
-  $('resetUsageBtn').addEventListener('click', () => {
-    if (!confirm('Resetirati statistiku korištenja?')) return;
+  $('resetUsageBtn').addEventListener('click', async () => {
+    if (!(await requirePassword('Resetirati statistiku korištenja?'))) return;
     resetUsageStats();
   });
   $('exportBackupBtn').addEventListener('click', exportBackup);
   $('importBackupBtn').addEventListener('click', () => $('importBackupFile').click());
-  $('importBackupFile').addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) {
-      if (confirm('Vratiti backup? Trenutni razgovor, pamćenje, protokoli, kontakti, troškovi i podsjetnici bit će zamijenjeni.')) importBackupFile(file);
+  $('importBackupFile').addEventListener('change', async (e) => {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    input.value = ''; // allow re-selecting the same file later
+    if (file && await requirePassword('Vratiti backup? Trenutni razgovor, pamćenje, protokoli, kontakti, troškovi i podsjetnici bit će zamijenjeni.')) {
+      importBackupFile(file);
     }
-    e.target.value = ''; // allow re-selecting the same file later
   });
+  // Password modal controls
+  $('pwConfirm').addEventListener('click', submitPassword);
+  $('pwCancel').addEventListener('click', () => closePasswordModal(false));
+  $('pwInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); submitPassword(); }
+    else if (e.key === 'Escape') { closePasswordModal(false); }
+  });
+  $('pwModal').addEventListener('click', (e) => { if (e.target === $('pwModal')) closePasswordModal(false); });
   $('addProtocolBtn').addEventListener('click', () => {
     const name = $('protocolNameInput').value.trim();
     const prompt = $('protocolPromptInput').value.trim();
