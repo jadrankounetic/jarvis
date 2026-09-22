@@ -530,6 +530,32 @@
   .pw-modal input:focus { border-color: var(--red); }
   .pw-error { color: var(--red); font-size: 11px; min-height: 16px; margin-top: 6px; }
 
+  /* Utilities (režije) cards */
+  .util-body { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .util-row { display: flex; justify-content: space-between; gap: 10px; }
+  .util-row .util-l { color: var(--text-dim); }
+  .util-row .util-v { color: var(--cyan-bright); text-align: right; }
+  .util-row.util-total .util-v { color: var(--gold); font-weight: 600; }
+  .util-problem { color: var(--red); font-size: 11px; }
+  .util-warning { color: var(--gold); font-size: 11px; }
+  .util-done { color: var(--gold); font-size: 12px; padding: 4px 0; }
+  .util-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 12px; border-top: 1px solid var(--border); }
+  .util-actions button {
+    flex: 1 1 auto; padding: 8px 10px; background: transparent;
+    border: 1px solid var(--cyan); color: var(--cyan);
+    font-family: 'Orbitron', sans-serif; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer;
+  }
+  .util-actions button:active { background: var(--cyan); color: #000; }
+  .util-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .util-actions button.util-save { border-color: var(--gold); color: var(--gold); }
+  .util-actions button.util-cancel { border-color: var(--red); color: var(--red); flex: 0 0 auto; }
+  .util-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .util-table th { color: var(--text-dim); font-weight: 400; text-align: right; padding: 3px 4px; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .util-table th:first-child, .util-table td:first-child { text-align: left; }
+  .util-table td { padding: 4px; text-align: right; border-top: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  .util-table td.util-uk { color: var(--gold); font-weight: 600; }
+  .util-bar { height: 3px; background: var(--gold); opacity: 0.6; margin-top: 2px; }
+
   .warning {
     padding: 10px 12px;
     border: 1px solid rgba(255, 181, 71, 0.4);
@@ -921,6 +947,34 @@
       Okine se jednom po kalendarskom danu, pri prvom otvaranju aplikacije taj dan (bilo koje doba dana).
     </div>
 
+    <h3>Režije</h3>
+    <div class="field">
+      <label>Firebase Database URL</label>
+      <input type="password" id="rezijeUrlInput" autocomplete="off" placeholder="https://<projekt>-default-rtdb.<regija>.firebasedatabase.app">
+      <div class="field-hint">Ista baza koju koristi aplikacija za režije. Sprema se samo na ovom uređaju, nikad u kod.</div>
+    </div>
+    <div class="field">
+      <label>Naziv čvora u bazi</label>
+      <input type="password" id="rezijeNodeInput" autocomplete="off" placeholder="naziv čvora">
+      <div class="field-hint">Dio adrese iza URL-a baze, bez ".json".</div>
+    </div>
+    <div class="field">
+      <label>Firebase auth token (opcionalno)</label>
+      <input type="password" id="rezijeAuthInput" autocomplete="off" placeholder="samo ako je baza zaključana pravilima">
+    </div>
+    <div class="field">
+      <label>Link na aplikaciju za režije (opcionalno)</label>
+      <input type="password" id="rezijeAppUrlInput" autocomplete="off" placeholder="puna adresa aplikacije, s ključem">
+      <div class="field-hint">Za naredbu "otvori režije".</div>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-secondary" type="button" id="rezijeTestBtn">Test veze</button>
+    </div>
+    <div class="field-hint" id="rezijeStatus" style="margin-top:6px;"></div>
+    <div class="info-note">
+      Glasom: "slikaj brojilo vode", "slikaj brojilo struje", "upiši očitanje voda 1250 struja 12040", "koliko su bile režije prošli mjesec", "kolika je cijena struje", "promijeni HRT na 10,62", "obriši zadnje očitanje", "otvori režije". Očitanje se sprema tek kad kažeš "potvrdi" ili tapneš Spremi.
+    </div>
+
     <h3>Expenses</h3>
     <div id="expensesSummary" class="usage-table"></div>
     <div id="expensesList" class="reminders-list"></div>
@@ -1048,9 +1102,17 @@ Tools available:
 - remember_fact — the user shares something personal worth remembering long-term (job, preferences, allergies, ongoing projects, family). Skip trivial one-off details.
 - send_message — the user asks to send a text/SMS/WhatsApp message to a saved contact. You only open a pre-filled message card; the user taps to actually send it.
 - get_expense_summary — the user asks about spending or expenses tracked from scanned receipts.
+- add_meter_reading — the user gives household meter readings (voda/water in m³, struja/electricity in kWh) for the režije tracker. Values may come in separate turns. It never saves by itself: read the values back and ask the user to say "potvrdi" to save or "odustani" to cancel.
+- capture_meter_photo — the user wants to photograph, scan or read a meter (brojilo, vodomjer, strujomjer).
+- get_utility_summary — questions about režije / utility costs: last period, average, trend, comparisons.
+- get_utility_prices — questions about current utility prices or fixed fees.
+- update_utility_price — the user wants to change a utility price or fee. Needs confirmation, like readings.
+- delete_last_meter_reading — the user wants to delete the latest meter reading (they enter a password on screen).
+- open_utilities_app — the user wants to open the separate režije app.
+Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
 
 For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
-For action tools (set_reminder/calendar/web_search/remember_fact/send_message/get_expense_summary): call directly, then briefly summarize the result in speech.`;
+For all other tools: call directly, then briefly summarize the result in speech.`;
 
   const PERSONALITY_LINES = [
     'Tone override: strictly professional and formal. No jokes, no irony, minimal small talk — efficient and businesslike at all times.',
@@ -1219,6 +1281,69 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           period: { type: 'string', enum: ['this_month', 'last_month', 'all_time'], description: 'Which period to summarize. Default this_month.' }
         }
       }
+    },
+    {
+      name: 'add_meter_reading',
+      description: 'Start or update a household utility meter reading (water in m³ and/or electricity in kWh) for the utilities (režije) tracker. Values may be given in separate turns and merge into one draft. Nothing is saved until the user confirms by saying "potvrdi" or tapping Save on the card.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          water_m3: { type: 'number', description: 'Water meter reading in whole cubic metres.' },
+          electricity_kwh: { type: 'number', description: 'Electricity meter reading in kWh.' },
+          date: { type: 'string', description: 'Reading date as YYYY-MM-DD. Omit for today.' }
+        }
+      }
+    },
+    {
+      name: 'capture_meter_photo',
+      description: 'Open the camera to photograph a utility meter (water or electricity) so its reading is read automatically.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          meter: { type: 'string', enum: ['water', 'electricity'], description: 'Which meter, if the user said.' }
+        }
+      }
+    },
+    {
+      name: 'get_utility_summary',
+      description: 'Get household utility (režije) costs computed from meter readings: water, electricity, fixed fees and totals per billing period, plus the overall average.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          periods: { type: 'integer', description: 'How many most recent periods to include (default 3, max 12).' }
+        }
+      }
+    },
+    {
+      name: 'get_utility_prices',
+      description: 'Get the current utility prices and fixed monthly fees used in the režije calculation.',
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'update_utility_price',
+      description: 'Propose changing one utility price or fixed fee. Not saved until the user confirms.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          key: {
+            type: 'string',
+            enum: ['c_m3_v', 'fix_v', 'c_kwh_s', 'mjer', 'pdv_s', 'doi', 'smece', 'kom', 'amis', 'hrt', 'ost'],
+            description: 'c_m3_v = water price per m³; fix_v = water fixed monthly fee; c_kwh_s = electricity price per kWh; mjer = electricity metering fee; pdv_s = VAT on electricity as a decimal (0.13 = 13%); doi = OI surcharge in kWh; smece = garbage; kom = communal fee; amis = AMIS; hrt = HRT TV fee; ost = other.'
+          },
+          value: { type: 'number', description: 'New value.' }
+        },
+        required: ['key', 'value']
+      }
+    },
+    {
+      name: 'delete_last_meter_reading',
+      description: 'Delete the most recent meter reading. The user must enter the delete password on screen.',
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'open_utilities_app',
+      description: 'Show a card that opens the separate household utilities (režije) app.',
+      input_schema: { type: 'object', properties: {} }
     }
   ];
 
@@ -1288,11 +1413,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       const body = {
         contents,
         systemInstruction: { parts: [{ text: system }] },
-        tools: [{ functionDeclarations: TOOLS.map(t => ({
-          name: t.name,
-          description: t.description,
-          parameters: t.input_schema,
-        }))}],
+        tools: [{ functionDeclarations: TOOLS.map(t => {
+          const decl = { name: t.name, description: t.description };
+          if (Object.keys(t.input_schema.properties || {}).length) decl.parameters = t.input_schema;
+          return decl;
+        })}],
         generationConfig: {
           maxOutputTokens: 1024,
           // Gemini 3 defaults to 'high' thinking which adds 5-15s latency.
@@ -1582,6 +1707,12 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     expenses: [],
     // Usage stats (real token/request counts from API responses; loaded below)
     usageStats: null,
+    // Utilities (režije) — shared Firebase DB with the separate utilities app.
+    // Kept only in localStorage, never in code.
+    rezijeUrl: localStorage.getItem('jarvis_rezije_url') || '',
+    rezijeNode: localStorage.getItem('jarvis_rezije_node') || '',
+    rezijeAuth: localStorage.getItem('jarvis_rezije_auth') || '',
+    rezijeAppUrl: localStorage.getItem('jarvis_rezije_app_url') || '',
     // Runtime
     history: [],
     recognition: null,
@@ -1763,11 +1894,13 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       enrichHistoryToolNames(state.history);
 
       const toolResults = [];
+      const calledTools = [];
       for (const block of result.content) {
         if (block.type === 'text' && block.text?.trim()) {
           collectedText.push(block.text);
           addMessage('assistant', block.text, { provider: adapter.label });
         } else if (block.type === 'tool_use') {
+          calledTools.push(block.name);
           const outcome = await executeTool(block);
           toolResults.push({
             type: 'tool_result',
@@ -1783,10 +1916,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       // Send tool results back to close the loop (required by Claude and OpenAI protocols)
       state.history.push({ role: 'user', content: toolResults });
 
-      // Optimization: skip the follow-up round if the model already spoke before
-      // the tool call. Our tools are display-only (map/YouTube/link) — a follow-up
-      // just adds 5-10s of latency without new useful info for the user.
-      if (collectedText.length > 0) break;
+      // Optimization: skip the follow-up round only when the model already spoke
+      // AND every tool it called just displays something (map/YouTube/link/camera).
+      // Data tools (search, calendar, režije...) always get a follow-up so the
+      // model can actually report the result.
+      if (collectedText.length > 0 && calledTools.every(n => NO_FOLLOWUP_TOOLS.has(n))) break;
     }
 
     persistHistory();
@@ -2435,6 +2569,489 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   }
 
   // ==================================================================
+  // UTILITIES (REŽIJE) — shares a Firebase Realtime Database with the
+  // separate household-utilities app. Jarvis only ever writes targeted
+  // pieces (one new entry, one price), never the whole node, to minimise
+  // conflicts with the other app, which rewrites the whole node on save.
+  // The calculation mirrors the other app exactly so totals always match.
+  // ==================================================================
+  const UTIL_PARAM_LABELS = {
+    c_m3_v: 'cijena vode po m³',
+    fix_v: 'fiksna naknada za vodu',
+    c_kwh_s: 'cijena struje po kWh',
+    mjer: 'mjerenje struje',
+    pdv_s: 'PDV na struju',
+    doi: 'dodatak OI',
+    smece: 'smeće',
+    kom: 'komunalije',
+    amis: 'AMIS',
+    hrt: 'HRT',
+    ost: 'ostalo',
+  };
+  const UTIL_PENDING_TTL = 10 * 60 * 1000;
+  let utilCache = null;            // { data, at }
+  let utilDraft = null;            // { v, k, d, createdAt }
+  let utilDraftCard = null;
+  let pendingPriceChange = null;   // { key, value, old, createdAt }
+  let utilPriceCard = null;
+  let pendingMeterCapture = null;  // { hint } — set by a tool, launched after the reply is spoken
+
+  function readRezijeInputs() {
+    const url = $('rezijeUrlInput').value.trim();
+    const node = $('rezijeNodeInput').value.trim().replace(/\.json$/i, '');
+    if (url !== state.rezijeUrl || node !== state.rezijeNode) utilCache = null;
+    state.rezijeUrl = url;
+    state.rezijeNode = node;
+    state.rezijeAuth = $('rezijeAuthInput').value.trim();
+    state.rezijeAppUrl = $('rezijeAppUrlInput').value.trim();
+  }
+  function utilConfigured() { return !!(state.rezijeUrl && state.rezijeNode); }
+  function utilUrl(path) {
+    const base = state.rezijeUrl.replace(/\/+$/, '');
+    const node = state.rezijeNode.replace(/^\/+|\/+$/g, '');
+    const auth = state.rezijeAuth ? `?auth=${encodeURIComponent(state.rezijeAuth)}` : '';
+    return `${base}/${node}${path || ''}.json${auth}`;
+  }
+  async function utilFetch(path, opts = {}) {
+    if (!utilConfigured()) throw new Error('Režije nisu povezane. U Settings → Režije upiši adresu Firebase baze i naziv čvora.');
+    const res = await fetch(utilUrl(path), { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+    if (!res.ok) throw await httpError(res, 'Firebase');
+    return res.json();
+  }
+  function utilNormEntries(raw) {
+    if (!raw) return [];
+    const arr = Array.isArray(raw) ? raw : Object.keys(raw).sort((a, b) => Number(a) - Number(b)).map(k => raw[k]);
+    return arr.filter(Boolean);
+  }
+  async function utilLoad(force) {
+    if (!force && utilCache && Date.now() - utilCache.at < 30000) return utilCache.data;
+    const raw = await utilFetch('');
+    if (!raw || !raw.params) throw new Error('U bazi nema podataka o režijama. Otvori aplikaciju za režije barem jednom da se baza postavi, pa pokušaj ponovno.');
+    const data = { entries: utilNormEntries(raw.entries), params: raw.params };
+    utilCache = { data, at: Date.now() };
+    return data;
+  }
+  // Identical to the utilities app's calc() so both apps show the same totals.
+  function utilCalc(ent, p) {
+    const r = [];
+    for (let i = 1; i < ent.length; i++) {
+      const pv = ent[i - 1], cu = ent[i], cp = cu.p || p;
+      const vm = cu.v - pv.v;
+      const vt = vm * cp.c_m3_v + (cp.fix_v || 0);
+      const sk = (cu.k - pv.k) + cp.doi;
+      const st = sk * cp.c_kwh_s * (1 + cp.pdv_s);
+      const fx = (cp.smece || 0) + (cp.kom || 0) + (cp.amis || 0) + (cp.hrt || 0) + (cp.ost || 0);
+      r.push({ id: cu.id, date: cu.d, vm, vt, sk, st, fx, uk: vt + st + fx });
+    }
+    return r;
+  }
+  function eur(n) {
+    return (n == null || isNaN(n)) ? '—' : n.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+  function numHr(n, dec = 0) {
+    return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('hr-HR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function todayHr() {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}.`;
+  }
+  function normalizeHrDate(s) {
+    if (!s) return todayHr();
+    let m = String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return `${m[3].padStart(2, '0')}.${m[2].padStart(2, '0')}.${m[1]}.`;
+    m = String(s).match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+    if (m) return `${m[1].padStart(2, '0')}.${m[2].padStart(2, '0')}.${m[3]}.`;
+    return todayHr();
+  }
+
+  // ---------- Draft reading (water + electricity, merged across turns/photos) ----------
+  function utilDraftActive() {
+    if (utilDraft && Date.now() - utilDraft.createdAt > UTIL_PENDING_TTL) utilDraft = null;
+    return !!utilDraft;
+  }
+  function utilDraftComplete() { return utilDraftActive() && utilDraft.v != null && utilDraft.k != null; }
+  function utilPriceActive() {
+    if (pendingPriceChange && Date.now() - pendingPriceChange.createdAt > UTIL_PENDING_TTL) pendingPriceChange = null;
+    return !!pendingPriceChange;
+  }
+
+  function utilValidateDraft(data) {
+    const ent = data.entries;
+    const last = ent[ent.length - 1] || null;
+    const problems = [], warnings = [];
+    let preview = null;
+    if (last) {
+      if (utilDraft.v != null && utilDraft.v < last.v) problems.push(`Voda ${numHr(utilDraft.v)} m³ je manja od prethodnog očitanja (${numHr(last.v)} m³).`);
+      if (utilDraft.k != null && utilDraft.k < last.k) problems.push(`Struja ${numHr(utilDraft.k)} kWh je manja od prethodnog očitanja (${numHr(last.k)} kWh).`);
+      if (ent.length >= 3) {
+        let sv = 0, sk = 0;
+        for (let i = 1; i < ent.length; i++) { sv += ent[i].v - ent[i - 1].v; sk += ent[i].k - ent[i - 1].k; }
+        const avgV = sv / (ent.length - 1), avgK = sk / (ent.length - 1);
+        if (utilDraft.v != null && avgV > 0 && utilDraft.v - last.v > avgV * 3) warnings.push(`Potrošnja vode (${numHr(utilDraft.v - last.v)} m³) je više od 3× veća od prosjeka — provjeri broj.`);
+        if (utilDraft.k != null && avgK > 0 && utilDraft.k - last.k > avgK * 3) warnings.push(`Potrošnja struje (${numHr(utilDraft.k - last.k)} kWh) je više od 3× veća od prosjeka — provjeri broj.`);
+      }
+      if (utilDraft.v != null && utilDraft.k != null && !problems.length) {
+        preview = utilCalc([last, { id: 0, d: utilDraft.d, v: utilDraft.v, k: utilDraft.k, p: data.params }], data.params)[0];
+      }
+    }
+    return { last, problems, warnings, preview };
+  }
+
+  async function utilMergeDraft(part) {
+    const data = await utilLoad();
+    if (!utilDraftActive()) utilDraft = { v: null, k: null, d: todayHr(), createdAt: Date.now() };
+    const v = part.v == null ? null : Number(part.v);
+    const k = part.k == null ? null : Number(part.k);
+    if (v != null && !isNaN(v)) utilDraft.v = v;
+    if (k != null && !isNaN(k)) utilDraft.k = k;
+    if (part.d) utilDraft.d = normalizeHrDate(part.d);
+    utilDraft.createdAt = Date.now();
+    const check = utilValidateDraft(data);
+    renderUtilDraftCard(check);
+    return check;
+  }
+
+  function utilDraftStatusText(check) {
+    let s = `Draft reading for ${utilDraft.d}: water ${utilDraft.v ?? 'MISSING'} m³, electricity ${utilDraft.k ?? 'MISSING'} kWh.`;
+    if (check.last) s += ` Previous reading ${check.last.d}: water ${check.last.v} m³, electricity ${check.last.k} kWh.`;
+    if (check.problems.length) return s + ' PROBLEM: ' + check.problems.join(' ') + ' Tell the user and ask for the correct number or a new photo.';
+    if (check.warnings.length) s += ' WARNING: ' + check.warnings.join(' ');
+    if (utilDraft.v == null || utilDraft.k == null) {
+      return s + ` Ask the user for the missing ${utilDraft.v == null ? 'water' : 'electricity'} reading — they can say the number or ask you to photograph the meter.`;
+    }
+    const cost = check.preview ? ` Estimated cost for this period: ${check.preview.uk.toFixed(2)} €.` : ' This will be the first (starting) reading, so no cost yet.';
+    return s + cost + ' NOT saved yet — read the values back briefly and ask the user to say "potvrdi" to save or "odustani" to cancel.';
+  }
+
+  // ---------- Cards ----------
+  function utilCard(existing, title, bodyHtml, buttons) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const card = (existing && existing.isConnected) ? existing : document.createElement('div');
+    card.className = 'card card-util';
+    card.innerHTML = `<div class="card-header"><span class="card-header-icon">⌂</span> ${title}</div><div class="util-body">${bodyHtml}</div>`
+      + (buttons && buttons.length ? `<div class="util-actions"></div>` : '');
+    if (buttons && buttons.length) {
+      const bar = card.querySelector('.util-actions');
+      buttons.forEach(b => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = b.label;
+        if (b.cls) btn.className = b.cls;
+        btn.disabled = !!b.disabled;
+        btn.addEventListener('click', b.onClick);
+        bar.appendChild(btn);
+      });
+    }
+    if (!card.isConnected) transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+    return card;
+  }
+  function utilRow(label, value, cls) {
+    return `<div class="util-row ${cls || ''}"><span class="util-l">${escapeHtml(label)}</span><span class="util-v">${escapeHtml(value)}</span></div>`;
+  }
+  function currentLang() { return state.lang === 'auto' ? state.currentLang : state.lang; }
+
+  function renderUtilDraftCard(check) {
+    const d = utilDraft;
+    let body = utilRow('Datum', d.d)
+      + utilRow('Voda', d.v != null ? `${numHr(d.v)} m³` : '— čeka')
+      + utilRow('Struja', d.k != null ? `${numHr(d.k)} kWh` : '— čeka');
+    if (check.last) body += utilRow('Prethodno', `${check.last.d} · ${numHr(check.last.v)} m³ · ${numHr(check.last.k)} kWh`);
+    if (check.preview) {
+      body += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${numHr(check.preview.sk)} kWh`)
+        + utilRow('Voda / Struja / Fiksni', `${eur(check.preview.vt)} / ${eur(check.preview.st)} / ${eur(check.preview.fx)}`)
+        + utilRow('Ukupno za razdoblje', eur(check.preview.uk), 'util-total');
+    }
+    check.problems.forEach(p => { body += `<div class="util-problem">✕ ${escapeHtml(p)}</div>`; });
+    check.warnings.forEach(w => { body += `<div class="util-warning">⚠ ${escapeHtml(w)}</div>`; });
+    const canSave = d.v != null && d.k != null && !check.problems.length;
+    utilDraftCard = utilCard(utilDraftCard, 'NOVO OČITANJE', body, [
+      { label: '📷 Voda', onClick: () => handleMeterCapture('', currentLang(), 'v') },
+      { label: '📷 Struja', onClick: () => handleMeterCapture('', currentLang(), 'k') },
+      { label: '✓ Spremi', cls: 'util-save', disabled: !canSave, onClick: () => utilConfirmPending(currentLang(), '') },
+      { label: '✕', cls: 'util-cancel', onClick: () => utilCancelPending(currentLang(), '') },
+    ]);
+  }
+  function utilFinalizeCard(card, title, text) {
+    if (card && card.isConnected) utilCard(card, title, `<div class="util-done">${escapeHtml(text)}</div>`, []);
+  }
+
+  function renderUtilSummaryCard(recent, avg, total) {
+    const max = Math.max(...recent.map(r => r.uk), 1);
+    const rows = recent.map(r => `<tr>
+        <td>${escapeHtml(r.date)}<div class="util-bar" style="width:${Math.max(4, Math.round(r.uk / max * 100))}%"></div></td>
+        <td>${numHr(r.vt, 2)}</td><td>${numHr(r.st, 2)}</td><td>${numHr(r.fx, 2)}</td>
+        <td class="util-uk">${numHr(r.uk, 2)}</td></tr>`).join('');
+    const body = `<div style="overflow-x:auto;"><table class="util-table">
+        <tr><th>Datum</th><th>Voda €</th><th>Struja €</th><th>Fiksni €</th><th>Ukupno €</th></tr>${rows}</table></div>`
+      + utilRow(`Prosjek (${total} razdoblja)`, eur(avg), 'util-total');
+    utilCard(null, 'REŽIJE', body, []);
+  }
+
+  // ---------- Summary / prices ----------
+  async function utilSummary(periods) {
+    const data = await utilLoad(true);
+    const res = utilCalc(data.entries, data.params);
+    if (!res.length) return 'There are fewer than two meter readings, so no costs can be calculated yet.';
+    const n = Math.max(1, Math.min(12, parseInt(periods, 10) || 3));
+    const recent = res.slice(-n);
+    const avg = res.reduce((s, r) => s + r.uk, 0) / res.length;
+    renderUtilSummaryCard(recent, avg, res.length);
+    const lines = recent.map(r => `Period ending ${r.date}: water ${r.vm.toFixed(2)} m³ = ${r.vt.toFixed(2)} €, electricity ${Math.round(r.sk)} kWh = ${r.st.toFixed(2)} €, fixed fees ${r.fx.toFixed(2)} €, TOTAL ${r.uk.toFixed(2)} €`);
+    return `Utility costs, oldest to newest (a table card is shown):\n${lines.join('\n')}\nAverage per period across all ${res.length} periods: ${avg.toFixed(2)} €.`;
+  }
+  async function utilPricesText() {
+    const data = await utilLoad(true);
+    const p = data.params;
+    const fixed = (p.smece || 0) + (p.kom || 0) + (p.amis || 0) + (p.hrt || 0) + (p.ost || 0);
+    const body = Object.keys(UTIL_PARAM_LABELS).map(k => utilRow(UTIL_PARAM_LABELS[k], k === 'pdv_s' ? `${numHr((p[k] || 0) * 100, 1)} %` : String(p[k] ?? '—'))).join('')
+      + utilRow('Ukupno fiksni mjesečno', eur(fixed), 'util-total');
+    utilCard(null, 'CIJENE REŽIJA', body, []);
+    return 'Current prices (a card is shown): ' + Object.keys(UTIL_PARAM_LABELS).map(k => `${UTIL_PARAM_LABELS[k]} (${k}) = ${p[k]}`).join('; ') + `. Fixed fees total ${fixed.toFixed(2)} € per month.`;
+  }
+  async function utilProposePrice(key, value) {
+    if (!(key in UTIL_PARAM_LABELS)) throw new Error(`Nepoznata stavka cijene: ${key}`);
+    let v = Number(value);
+    if (isNaN(v) || v < 0) throw new Error('Neispravna vrijednost cijene.');
+    if (key === 'pdv_s' && v > 1) v = v / 100; // "13" meaning 13 %
+    const data = await utilLoad(true);
+    pendingPriceChange = { key, value: v, old: data.params[key], createdAt: Date.now() };
+    utilPriceCard = utilCard(null, 'PROMJENA CIJENE',
+      utilRow(UTIL_PARAM_LABELS[key], `${pendingPriceChange.old ?? '—'} → ${v}`)
+      + `<div class="util-warning">Vrijedi za nova očitanja; stara ostaju po starim cijenama.</div>`,
+      [
+        { label: '✓ Spremi', cls: 'util-save', onClick: () => utilConfirmPending(currentLang(), '') },
+        { label: '✕', cls: 'util-cancel', onClick: () => utilCancelPending(currentLang(), '') },
+      ]);
+    return pendingPriceChange;
+  }
+
+  // ---------- Commit / cancel ----------
+  async function utilCommitDraft() {
+    if (!utilDraftComplete()) throw new Error('Očitanje nije potpuno — nedostaje voda ili struja.');
+    const data = await utilLoad(true); // fresh data right before writing
+    const check = utilValidateDraft(data);
+    if (check.problems.length) { renderUtilDraftCard(check); throw new Error(check.problems.join(' ')); }
+    const raw = await utilFetch('/entries');
+    let nextIndex = 0;
+    if (Array.isArray(raw)) nextIndex = raw.length;
+    else if (raw && typeof raw === 'object') nextIndex = Math.max(-1, ...Object.keys(raw).map(Number).filter(n => !isNaN(n))) + 1;
+    const entry = { id: Date.now(), d: utilDraft.d, v: utilDraft.v, k: utilDraft.k, p: { ...data.params } };
+    await utilFetch(`/entries/${nextIndex}`, { method: 'PUT', body: JSON.stringify(entry) });
+    const entries = [...data.entries, entry];
+    utilCache = { data: { entries, params: data.params }, at: Date.now() };
+    utilDraft = null;
+    const res = utilCalc(entries, data.params);
+    return entries.length >= 2 ? res[res.length - 1] : null;
+  }
+  async function utilCommitPrice() {
+    const pc = pendingPriceChange;
+    await utilFetch('/params', { method: 'PATCH', body: JSON.stringify({ [pc.key]: pc.value }) });
+    utilCache = null;
+    pendingPriceChange = null;
+    return pc;
+  }
+
+  async function utilConfirmPending(lang, spokenText) {
+    if (state.processing || state.speaking || state.cameraActive) return;
+    if (spokenText) addMessage('user', spokenText);
+    state.processing = true; setState('thinking'); updateMic();
+    let msg, isError = false;
+    try {
+      if (utilPriceActive()) {
+        const pc = await utilCommitPrice();
+        msg = `Spremljeno: ${UTIL_PARAM_LABELS[pc.key]} je sada ${pc.key === 'pdv_s' ? numHr(pc.value * 100, 1) + ' posto' : numHr(pc.value, 2)}.`;
+        utilFinalizeCard(utilPriceCard, 'PROMJENA CIJENE', '✓ ' + msg);
+      } else {
+        const r = await utilCommitDraft();
+        msg = r
+          ? `Očitanje spremljeno. Potrošeno je ${numHr(r.vm)} kubika vode i ${numHr(r.sk)} kilovatsati struje. Režije za ovo razdoblje su ${eur(r.uk)}.`
+          : 'Početno očitanje je spremljeno.';
+        utilFinalizeCard(utilDraftCard, 'NOVO OČITANJE', '✓ ' + msg);
+      }
+    } catch (e) {
+      msg = `Nije spremljeno: ${e.message}`;
+      isError = true;
+    }
+    state.processing = false; updateMic();
+    addMessage(isError ? 'error' : 'assistant', msg);
+    state.history.push({ role: 'user', content: spokenText || 'Potvrdi.' });
+    state.history.push({ role: 'assistant', content: msg });
+    persistHistory();
+    await speak(msg, lang);
+  }
+  async function utilCancelPending(lang, spokenText) {
+    if (state.processing || state.speaking) return;
+    if (spokenText) addMessage('user', spokenText);
+    if (utilPriceActive()) { pendingPriceChange = null; utilFinalizeCard(utilPriceCard, 'PROMJENA CIJENE', 'Odustano — ništa nije promijenjeno.'); }
+    else { utilDraft = null; utilFinalizeCard(utilDraftCard, 'NOVO OČITANJE', 'Odustano — ništa nije spremljeno.'); }
+    const msg = 'U redu, odustao sam. Ništa nije spremljeno.';
+    addMessage('assistant', msg);
+    state.history.push({ role: 'user', content: spokenText || 'Odustani.' });
+    state.history.push({ role: 'assistant', content: msg });
+    persistHistory();
+    await speak(msg, lang);
+  }
+
+  // Short yes/no replies while something is waiting for confirmation are
+  // handled locally (fast, deterministic) instead of going to the AI model.
+  function utilHandleVoiceConfirm(text, lang) {
+    const confirmable = utilDraftComplete() || utilPriceActive();
+    const cancelable = utilDraftActive() || utilPriceActive();
+    if (!cancelable) return false;
+    const t = text.trim().toLowerCase().replace(/[.!?,]+$/, '');
+    if (t.length > 40) return false;
+    if (confirmable && /^(da|potvrdi|potvrđujem|potvrdjujem|spremi|spremi to|može|moze|u redu|ok|okej|yes|confirm|save)\b/.test(t)) {
+      utilConfirmPending(lang, text.trim()); return true;
+    }
+    if (/^(ne|odustani|poništi|ponisti|nemoj|otkaži|otkazi|cancel|no)\b/.test(t)) {
+      utilCancelPending(lang, text.trim()); return true;
+    }
+    return false;
+  }
+
+  async function utilDeleteLast() {
+    const data = await utilLoad(true);
+    if (data.entries.length <= 1) return 'Only the starting reading exists (or none), so there is nothing to delete.';
+    const last = data.entries.reduce((a, b) => (b.id > a.id ? b : a));
+    const ok = await requirePassword(`Obrisati očitanje ${last.d} (voda ${numHr(last.v)} m³, struja ${numHr(last.k)} kWh)?`);
+    if (!ok) return 'The user cancelled or entered a wrong password. Nothing was deleted.';
+    const raw = await utilFetch('/entries');
+    const keys = Array.isArray(raw) ? raw.map((x, i) => (x ? String(i) : null)).filter(Boolean) : Object.keys(raw || {});
+    const get = k => (Array.isArray(raw) ? raw[Number(k)] : raw[k]);
+    const keyOf = keys.find(k => get(k) && get(k).id === last.id);
+    const maxKey = String(Math.max(...keys.map(Number)));
+    if (keyOf != null && keyOf === maxKey) {
+      await utilFetch(`/entries/${keyOf}`, { method: 'DELETE' });
+    } else {
+      // Not the last array slot — rewrite the list so it stays gap-free for the other app.
+      await utilFetch('/entries', { method: 'PUT', body: JSON.stringify(utilNormEntries(raw).filter(e => e.id !== last.id)) });
+    }
+    utilCache = null;
+    return `Deleted the reading from ${last.d}.`;
+  }
+
+  // ---------- Meter photo ----------
+  const METER_SYSTEM_PROMPT = `You read household utility meters from a photo. Respond with ONLY a JSON object, no markdown and no other text:
+{"type": "water" | "electricity" | "unknown", "value": <number or null>, "confidence": "high" | "medium" | "low", "note": "<very short note in Croatian>"}
+Rules:
+- Water meter (m³): report only whole cubic metres — the black-on-white digits. Ignore red digits, red rollers and small dials (litres/decimals).
+- Electricity meter (kWh): report the total consumption register in whole kWh (often labelled 1.8.0, or the main kWh number). Ignore digits after the decimal point. If only a tariff register such as 1.8.1 or 1.8.2 is visible, say so in the note and use confidence "low".
+- If any digit is blurred, reflected, cut off or unclear, use confidence "low". If you cannot read a number at all, value must be null.
+- Never guess digits.`;
+
+  function parseMeterResponse(raw) {
+    const txt = String(raw || '').replace(/```json|```/gi, '');
+    const m = txt.match(/\{[\s\S]*\}/);
+    let obj = {};
+    try { obj = m ? JSON.parse(m[0]) : {}; } catch { obj = {}; }
+    let value = obj.value;
+    if (typeof value === 'string') value = parseFloat(value.replace(/[\s.]/g, '').replace(',', '.'));
+    if (typeof value !== 'number' || isNaN(value)) value = null;
+    const type = ['water', 'electricity'].includes(obj.type) ? obj.type : 'unknown';
+    const confidence = ['high', 'medium', 'low'].includes(obj.confidence) ? obj.confidence : 'low';
+    return { type, value, confidence, note: obj.note ? String(obj.note) : '' };
+  }
+  function meterHintFromText(t) {
+    t = (t || '').toLowerCase();
+    if (/vod|water|kubik|m3|m³/.test(t)) return 'v';
+    if (/struj|kwh|electric|kilovat/.test(t)) return 'k';
+    return null;
+  }
+  function isMeterIntent(text) {
+    const t = (text || '').toLowerCase();
+    return /(slikaj|uslikaj|fotografiraj|očitaj|ocitaj|skeniraj|pročitaj|procitaj|scan|read|photograph|take a (photo|picture) of)\s+(mi\s+)?(i\s+)?(the\s+)?(water\s+|electricity\s+|electric\s+)?(brojil|vodomjer|strujomjer|meter)/.test(t)
+      || /\b(brojil\w*|vodomjer\w*|strujomjer\w*)\b[\s\S]*\b(slikaj|uslikaj|očitaj|ocitaj|skeniraj)\b/.test(t);
+  }
+  async function callVisionWithFallback(base64Jpeg, promptText, systemPrompt, maxTokens) {
+    const available = ['anthropic', 'gemini'].filter(p => state.keys[p]);
+    if (!available.length) throw new Error('Za čitanje slike treba Anthropic ili Gemini API ključ.');
+    let lastErr;
+    for (const p of available) {
+      try {
+        return p === 'anthropic'
+          ? await callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens)
+          : await callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens);
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  async function handleMeterCapture(spokenText, lang, hint) {
+    if (state.recognizing || state.processing || state.speaking || state.cameraActive) return;
+    const label = spokenText || (hint === 'k' ? '📷 Brojilo struje' : hint === 'v' ? '📷 Brojilo vode' : '📷 Brojilo');
+    addMessage('user', label);
+    const say = async (m, isErr) => {
+      addMessage(isErr ? 'error' : 'assistant', m);
+      state.history.push({ role: 'user', content: spokenText || label });
+      state.history.push({ role: 'assistant', content: m });
+      persistHistory();
+      await speak(m, lang);
+    };
+    if (!utilConfigured()) { await say('Režije nisu povezane. U Settings, u sekciji Režije, upiši adresu baze i naziv čvora.', true); return; }
+    if (!(state.keys.anthropic || state.keys.gemini)) { await say('Za očitavanje brojila treba Anthropic ili Gemini API ključ.', true); return; }
+    hint = hint || meterHintFromText(spokenText);
+
+    stopWakeWordListening();
+    state.cameraActive = true; setState('camera'); updateMic();
+    let base64;
+    try { base64 = await captureFromCamera(); }
+    catch (err) { state.cameraActive = false; setState('idle'); updateMic(); await say(`Kamera nije dostupna: ${err.message}`, true); return; }
+    state.cameraActive = false;
+    if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; }
+
+    state.processing = true; setState('thinking'); updateMic();
+    let reading;
+    try {
+      reading = parseMeterResponse(await callVisionWithFallback(base64, 'Pročitaj stanje ovog brojila.', METER_SYSTEM_PROMPT, 300));
+    } catch (err) {
+      state.processing = false; setState('idle'); updateMic();
+      await say(`Očitavanje nije uspjelo: ${err.message}`, true); return;
+    }
+    state.processing = false; setState('idle'); updateMic();
+
+    // Priority: what the user said > what the model saw > the one still missing in the draft
+    let type = hint || (reading.type === 'water' ? 'v' : reading.type === 'electricity' ? 'k' : null);
+    if (!type && utilDraftActive()) {
+      if (utilDraft.v != null && utilDraft.k == null) type = 'k';
+      else if (utilDraft.k != null && utilDraft.v == null) type = 'v';
+    }
+    if (reading.value == null || reading.confidence === 'low') {
+      await say(`Ne mogu pouzdano pročitati brojilo${reading.note ? ' — ' + reading.note : ''}. Slikaj ponovno bliže i bez odsjaja, ili mi reci broj.`, true);
+      return;
+    }
+    if (!type) {
+      await say(`Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "slikaj brojilo vode" ili "slikaj brojilo struje".`);
+      return;
+    }
+    let check;
+    try { check = await utilMergeDraft(type === 'v' ? { v: reading.value } : { k: reading.value }); }
+    catch (err) { await say(err.message, true); return; }
+
+    const what = type === 'v' ? `${numHr(reading.value)} kubika na brojilu vode` : `${numHr(reading.value)} kilovatsati na brojilu struje`;
+    let next;
+    if (check.problems.length) next = check.problems.join(' ') + ' Slikaj ponovno ili mi reci ispravan broj.';
+    else if (utilDraft.v == null) next = 'Sada slikaj brojilo vode.';
+    else if (utilDraft.k == null) next = 'Sada slikaj brojilo struje.';
+    else next = (check.preview ? `Režije za ovo razdoblje bit će ${eur(check.preview.uk)}. ` : '') + 'Reci "potvrdi" za spremanje ili "odustani".';
+    if (check.warnings.length && !check.problems.length) next = check.warnings.join(' ') + ' ' + next;
+    await say(`Očitao sam ${what}. ${next}`);
+  }
+
+  // ---------- Single entry point for every recognised utterance ----------
+  function routeUtterance(text, lang) {
+    const t = (text || '').trim();
+    if (!t) return;
+    if (utilHandleVoiceConfirm(t, lang)) return;
+    if (isMeterIntent(t)) { handleMeterCapture(t, lang); return; }
+    const protocol = matchProtocolIntent(t);
+    if (protocol) { handleUserMessage(protocol.prompt, lang, { displayText: `⚡ ${protocol.name}` }); return; }
+    if (isDocumentIntent(t)) { handleCameraRequest(t, lang, { mode: 'document' }); return; }
+    if (isCameraIntent(t)) { handleCameraRequest(t, lang); return; }
+    handleUserMessage(t, lang);
+  }
+
+  // ==================================================================
   // GOOGLE CALENDAR (client-side OAuth via Google Identity Services)
   // ==================================================================
   let googleTokenClient = null;
@@ -2593,6 +3210,27 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         }
         case 'get_expense_summary':
           return getExpenseSummary(toolUse.input.period);
+        case 'add_meter_reading': {
+          const check = await utilMergeDraft({ v: toolUse.input.water_m3, k: toolUse.input.electricity_kwh, d: toolUse.input.date });
+          return utilDraftStatusText(check);
+        }
+        case 'capture_meter_photo':
+          pendingMeterCapture = { hint: toolUse.input.meter === 'water' ? 'v' : toolUse.input.meter === 'electricity' ? 'k' : null };
+          return 'The camera opens right after you finish speaking. Say only one short sentence, e.g. "Otvaram kameru."';
+        case 'get_utility_summary':
+          return await utilSummary(toolUse.input.periods);
+        case 'get_utility_prices':
+          return await utilPricesText();
+        case 'update_utility_price': {
+          const pc = await utilProposePrice(toolUse.input.key, toolUse.input.value);
+          return `Proposed: ${UTIL_PARAM_LABELS[pc.key]} from ${pc.old} to ${pc.value}. NOT saved yet — ask the user to say "potvrdi" to save or "odustani" to cancel.`;
+        }
+        case 'delete_last_meter_reading':
+          return await utilDeleteLast();
+        case 'open_utilities_app':
+          if (!state.rezijeAppUrl) return 'No link to the utilities app is set. Tell the user to add it in Settings → Režije.';
+          renderLinkCard({ url: state.rezijeAppUrl, title: 'Režije', description: 'Otvori aplikaciju za režije' });
+          return 'Card shown.';
         default: return 'Unknown tool.';
       }
     } catch (e) {
@@ -2661,11 +3299,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       state.recognizing = false;
       if (interimEl) interimEl.remove();
       if (finalText.trim()) {
-        const protocol = matchProtocolIntent(finalText);
-        if (protocol) handleUserMessage(protocol.prompt, lang, { displayText: `⚡ ${protocol.name}` });
-        else if (isDocumentIntent(finalText)) handleCameraRequest(finalText.trim(), lang, { mode: 'document' });
-        else if (isCameraIntent(finalText)) handleCameraRequest(finalText.trim(), lang);
-        else handleUserMessage(finalText.trim(), lang);
+        routeUtterance(finalText, lang);
       } else {
         setState('idle');
         resumeWakeWordIfEnabled();
@@ -2730,12 +3364,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         if (/jarvis/i.test(text)) {
           const command = extractAfterWakeWord(text);
           try { rec.stop(); } catch {}
-          if (command.length > 2) {
-            const protocol = matchProtocolIntent(command);
-            if (protocol) handleUserMessage(protocol.prompt, rec.lang, { displayText: `⚡ ${protocol.name}` });
-            else if (isDocumentIntent(command)) handleCameraRequest(command, rec.lang, { mode: 'document' });
-            else if (isCameraIntent(command)) handleCameraRequest(command, rec.lang);
-            else handleUserMessage(command, rec.lang);
+          if (command.length > 1) {
+            routeUtterance(command, rec.lang);
           } else {
             startListening();
           }
@@ -3310,7 +3940,13 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       state.processing = false;
       if (reply) await speak(reply, lang); // speak()'s finally resumes wake word
       else { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); }
+      if (pendingMeterCapture) {
+        const hint = pendingMeterCapture.hint;
+        pendingMeterCapture = null;
+        handleMeterCapture('', lang, hint);
+      }
     } catch (err) {
+      pendingMeterCapture = null;
       state.processing = false;
       addMessage('error', err.message);
       setState('error');
@@ -3347,6 +3983,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     $('bootSequenceToggle').checked = state.bootSequenceEnabled;
     $('continuousConvToggle').checked = state.continuousConversation;
     $('memoryRetentionSelect').value = String(state.memoryRetentionDays);
+    $('rezijeUrlInput').value = state.rezijeUrl;
+    $('rezijeNodeInput').value = state.rezijeNode;
+    $('rezijeAuthInput').value = state.rezijeAuth;
+    $('rezijeAppUrlInput').value = state.rezijeAppUrl;
+    $('rezijeStatus').textContent = '';
     $('morningBriefingToggle').checked = state.morningBriefingEnabled;
     $('morningBriefingPrompt').value = state.morningBriefingPrompt;
 
@@ -3392,6 +4033,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     state.personality = parseInt($('personalitySlider').value, 10);
     state.continuousConversation = $('continuousConvToggle').checked;
     state.memoryRetentionDays = parseInt($('memoryRetentionSelect').value, 10);
+    readRezijeInputs();
     state.bootSequenceEnabled = $('bootSequenceToggle').checked;
     state.morningBriefingEnabled = $('morningBriefingToggle').checked;
     state.morningBriefingPrompt = $('morningBriefingPrompt').value.trim() || state.morningBriefingPrompt;
@@ -3422,6 +4064,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     localStorage.setItem('jarvis_personality', String(state.personality));
     localStorage.setItem('jarvis_continuous_conv', String(state.continuousConversation));
     localStorage.setItem('jarvis_memory_retention', String(state.memoryRetentionDays));
+    localStorage.setItem('jarvis_rezije_url', state.rezijeUrl);
+    localStorage.setItem('jarvis_rezije_node', state.rezijeNode);
+    localStorage.setItem('jarvis_rezije_auth', state.rezijeAuth);
+    localStorage.setItem('jarvis_rezije_app_url', state.rezijeAppUrl);
     pruneExpiredMemories(); // apply a shortened retention window immediately
     localStorage.setItem('jarvis_boot_sequence', String(state.bootSequenceEnabled));
     localStorage.setItem('jarvis_morning_briefing', String(state.morningBriefingEnabled));
@@ -3489,6 +4135,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
+      'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
       // Legacy keys from older versions
@@ -3544,6 +4191,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;
@@ -3633,6 +4281,19 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     else if (e.key === 'Escape') { closePasswordModal(false); }
   });
   $('pwModal').addEventListener('click', (e) => { if (e.target === $('pwModal')) closePasswordModal(false); });
+  $('rezijeTestBtn').addEventListener('click', async () => {
+    readRezijeInputs();
+    const st = $('rezijeStatus');
+    st.style.color = ''; st.textContent = 'Spajanje...';
+    try {
+      const data = await utilLoad(true);
+      st.style.color = 'var(--gold)';
+      st.textContent = `✓ Povezano — ${data.entries.length} očitanja u bazi. (Klikni Save da spremiš postavke.)`;
+    } catch (e) {
+      st.style.color = 'var(--red)';
+      st.textContent = '✕ ' + e.message;
+    }
+  });
   $('addProtocolBtn').addEventListener('click', () => {
     const name = $('protocolNameInput').value.trim();
     const prompt = $('protocolPromptInput').value.trim();
