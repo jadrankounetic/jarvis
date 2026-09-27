@@ -796,10 +796,20 @@
       <div class="field">
         <label>Model</label>
         <select id="anthropicModel">
-          <option value="claude-opus-4-7">Claude Opus 4.7 — max capability</option>
-          <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6 — balanced</option>
-          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fast/cheap</option>
+          <option value="claude-opus-5-5">Claude Opus 5.5 — najnoviji, vrhunski ($4 / $20 po 1M tokena)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 — uravnotežen</option>
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — najbrži i najjeftiniji ($1 / $5)</option>
+          <option value="claude-fable-5-1">Claude Fable 5.1 — najjači, najskuplji</option>
         </select>
+      </div>
+      <div class="field">
+        <label>Brzina razmišljanja</label>
+        <select id="anthropicEffort">
+          <option value="low">Brzo — preporučeno za glas</option>
+          <option value="medium">Uravnoteženo</option>
+          <option value="high">Temeljito — sporije i skuplje</option>
+        </select>
+        <div class="field-hint">Opus 5.5, Sonnet 5 i Fable 5.1 uvijek razmišljaju prije odgovora; ovo određuje koliko. Haiku 4.5 ne razmišlja pa ga ova postavka ne mijenja.</div>
       </div>
     </div>
 
@@ -813,9 +823,11 @@
       <div class="field">
         <label>Model</label>
         <select id="geminiModel">
-          <option value="gemini-3-flash-preview" selected>Gemini 3 Flash Preview — frontier-class, free tier</option>
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash — najnoviji, najbolji (malo besplatnih upita dnevno)</option>
+          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — brz, puno više besplatnih upita</option>
+          <option value="gemini-3-flash-preview">Gemini 3 Flash Preview — dosadašnji</option>
         </select>
-        <div class="field-hint">Besplatan tier, brz i kvalitetan.</div>
+        <div class="field-hint">Svi su u besplatnom paketu (bez plaćanja), ali s dnevnim ograničenjem broja upita. Kad se potroši, Jarvis automatski prelazi na sljedećeg providera.</div>
       </div>
     </div>
 
@@ -829,12 +841,13 @@
       <div class="field">
         <label>Model</label>
         <select id="groqModel">
-          <option value="openai/gpt-oss-120b" selected>GPT-OSS 120B — strong reasoning (replaces Llama 3.3 70B)</option>
-          <option value="openai/gpt-oss-20b">GPT-OSS 20B — fastest (replaces Llama 3.1 8B)</option>
-          <option value="qwen/qwen3.6-27b">Qwen 3.6 27B — reasoning + vision</option>
-          <option value="groq/compound">Groq Compound — agentic (web search + code)</option>
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B — pouzdan, dobar za alate (preporuka)</option>
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B — najbrži</option>
+          <option value="qwen/qwen3.8-27b">Qwen 3.8 27B — najnoviji Qwen</option>
+          <option value="qwen/qwen3.6-27b">Qwen 3.6 27B — prethodni Qwen</option>
+          <option value="minimaxai/minimax-m2.7">MiniMax M2.7 — novi, jak u zadacima s više koraka</option>
         </select>
-        <div class="field-hint">Groq je 16.8.2026 ugasio Llama 3.3/3.1 modele — zamijenjeni GPT-OSS modelima.</div>
+        <div class="field-hint">Svi podržavaju Jarvisove alate (mape, kalendar, režije...). Groq Compound je uklonjen jer ih ne podržava.</div>
       </div>
     </div>
 
@@ -1451,34 +1464,79 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ==================================================================
 
   // ---------------- ANTHROPIC ----------------
+  // Claude Opus 5.5 / Sonnet 5 / Fable 5.1 always think before answering:
+  //  - depth is set only with output_config.effort (no thinking / temperature fields);
+  //  - max_tokens covers thinking + text, so it must leave room for both;
+  //  - thinking blocks must go back unchanged inside a tool loop, and the system
+  //    prompt must not change mid-loop (both handled in runToolLoop).
+  // Haiku 4.5 does not think and does not take an effort setting.
+  const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+  function anthropicThinks(model) { return !/haiku/i.test(model || ''); }
+
+  // Thinking from earlier, finished turns is dropped (only the current tool loop
+  // keeps its thinking). This keeps every request valid even though the system
+  // prompt (time, memory) changes from one turn to the next.
+  function prepareAnthropicMessages(messages, opts = {}) {
+    const clean = stripInternalFields(messages);
+    let turn = 0;
+    for (let i = clean.length - 1; i >= 0; i--) {
+      const m = clean[i];
+      if (m.role === 'user' && !(Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result'))) { turn = i; break; }
+    }
+    if (opts.currentTurnOnly) return clean.slice(turn);
+    return clean.map((m, i) => {
+      if (i >= turn || m.role !== 'assistant' || !Array.isArray(m.content)) return m;
+      const kept = m.content.filter(b => b.type !== 'thinking' && b.type !== 'redacted_thinking');
+      if (kept.length === m.content.length) return m;
+      return { ...m, content: kept.length ? kept : [{ type: 'text', text: '…' }] };
+    });
+  }
+
+  // POST with two safety nets: if a model rejects the effort setting, retry
+  // without it; if it rejects replayed thinking, retry with just the current turn.
+  async function anthropicPost(apiKey, body, rawMessages) {
+    const send = b => fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(b),
+    });
+    let res = await send(body);
+    if (res.status === 400) {
+      const t = await res.clone().text();
+      if (body.output_config && /effort|output_config/i.test(t)) {
+        delete body.output_config;
+        res = await send(body);
+      } else if (rawMessages && /thinking/i.test(t)) {
+        body.messages = prepareAnthropicMessages(rawMessages, { currentTurnOnly: true });
+        res = await send(body);
+      }
+    }
+    if (!res.ok) throw await httpError(res, 'Anthropic');
+    const data = await res.json();
+    trackUsage('anthropic', data.usage?.input_tokens, data.usage?.output_tokens);
+    return data;
+  }
+
   const anthropicAdapter = {
     name: 'anthropic',
     label: 'CLAUDE',
     async call({ apiKey, model, messages, system }) {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 1024,
-          system,
-          tools: TOOLS,
-          messages: stripInternalFields(messages),
-        }),
-      });
-      if (!res.ok) throw await httpError(res, 'Anthropic');
-      const data = await res.json();
-      trackUsage('anthropic', data.usage?.input_tokens, data.usage?.output_tokens);
-      // Already in internal format — return blocks + stop_reason
-      return {
-        content: data.content,
-        stop_reason: data.stop_reason,
+      const body = {
+        model,
+        max_tokens: anthropicThinks(model) ? 8000 : 1500,
+        system,
+        tools: TOOLS,
+        messages: prepareAnthropicMessages(messages),
       };
+      if (anthropicThinks(model)) body.output_config = { effort: state.anthropicEffort || 'low' };
+      const data = await anthropicPost(apiKey, body, messages);
+      // Already in internal format — return blocks (thinking included, kept as-is) + stop_reason
+      return { content: data.content || [], stop_reason: data.stop_reason };
     }
   };
 
@@ -1506,7 +1564,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     label: 'GEMINI',
     async call({ apiKey, model, messages, system }) {
       // Convert Anthropic-style messages -> Gemini contents
-      const contents = messages.map(msgToGeminiContent);
+      const contents = messages.map(msgToGeminiContent).filter(c => c.parts.length); // e.g. a Claude turn that was only thinking
       const body = {
         contents,
         systemInstruction: { parts: [{ text: system }] },
@@ -1516,14 +1574,14 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           return decl;
         })}],
         generationConfig: {
-          maxOutputTokens: 1024,
+          maxOutputTokens: 4096,
           // Gemini 3 defaults to 'high' thinking which adds 5-15s latency.
           // 'low' is Google's recommendation for voice assistants and chat.
           thinkingConfig: { thinkingLevel: 'low' },
         },
       };
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-      const res = await fetch(url, {
+      const send = () => fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1531,6 +1589,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         },
         body: JSON.stringify(body),
       });
+      let res = await send();
+      if (res.status === 400 && /thinking/i.test(await res.clone().text())) {
+        delete body.generationConfig.thinkingConfig; // a model without thinking levels
+        res = await send();
+      }
       if (!res.ok) throw await httpError(res, 'Gemini');
       const data = await res.json();
       trackUsage('gemini', data.usageMetadata?.promptTokenCount, data.usageMetadata?.candidatesTokenCount);
@@ -1613,18 +1676,24 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
               parameters: t.input_schema,
             },
           })),
-          max_tokens: 1024,
+          max_tokens: 4096, // reasoning models count their thinking here too
         };
+        if (/^qwen\//.test(model)) body.reasoning_format = 'hidden'; // keep Qwen's thinking out of the spoken reply
         const headers = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
           ...(extraHeaders || {}),
         };
-        const res = await fetch(endpoint, {
+        const send = () => fetch(endpoint, {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
         });
+        let res = await send();
+        if (res.status === 400 && body.reasoning_format && /reasoning/i.test(await res.clone().text())) {
+          delete body.reasoning_format;
+          res = await send();
+        }
         if (!res.ok) throw await httpError(res, label);
         const data = await res.json();
         trackUsage(name, data.usage?.prompt_tokens, data.usage?.completion_tokens);
@@ -1678,6 +1747,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
             });
           }
         }
+        if (!text && !toolCalls.length) continue; // e.g. a Claude turn that was only thinking
         const assistantMsg = { role: 'assistant', content: text || '' };
         if (toolCalls.length) assistantMsg.tool_calls = toolCalls;
         out.push(assistantMsg);
@@ -1704,7 +1774,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (!choice) throw new Error('No choices in response');
     const msg = choice.message;
     const content = [];
-    if (msg.content) content.push({ type: 'text', text: msg.content });
+    // Reasoning models sometimes put their thinking inline in <think> tags — never speak it.
+    const visible = String(msg.content || '').replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').trim();
+    if (visible) content.push({ type: 'text', text: visible });
     if (msg.tool_calls) {
       for (const tc of msg.tool_calls) {
         let input = {};
@@ -1762,7 +1834,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     },
     // Model per provider
     models: {
-      anthropic: localStorage.getItem('jarvis_anthropic_model') || 'claude-sonnet-4-6',
+      anthropic: localStorage.getItem('jarvis_anthropic_model') || 'claude-opus-5-5',
       gemini: localStorage.getItem('jarvis_gemini_model') || 'gemini-3-flash-preview',
       groq: localStorage.getItem('jarvis_groq_model') || 'openai/gpt-oss-120b',
       openrouter: localStorage.getItem('jarvis_openrouter_model') || 'meta-llama/llama-3.3-70b-instruct:free',
@@ -1811,6 +1883,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     rezijeAuth: localStorage.getItem('jarvis_rezije_auth') || '',
     rezijeAppUrl: localStorage.getItem('jarvis_rezije_app_url') || '',
     rezijeTitle: localStorage.getItem('jarvis_rezije_title') || '',
+    anthropicEffort: localStorage.getItem('jarvis_anthropic_effort') || 'low',
     // Runtime
     history: [],
     recognition: null,
@@ -1826,6 +1899,25 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   try {
     state.protocols = JSON.parse(localStorage.getItem('jarvis_protocols') || '[]');
   } catch { state.protocols = []; }
+
+  // Replace model IDs that were removed or retired with their current equivalents,
+  // so an old saved choice never points at a model that no longer exists.
+  {
+    const MODEL_MIGRATIONS = {
+      'claude-opus-4-7': 'claude-opus-5-5',
+      'claude-sonnet-4-6': 'claude-sonnet-5',
+      'groq/compound': 'openai/gpt-oss-120b',
+      'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+      'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+      'qwen-2.5-coder-32b': 'openai/gpt-oss-120b',
+      'gemini-3.1-pro-preview': 'gemini-3-flash-preview',
+      'gemini-2.5-flash': 'gemini-3-flash-preview',
+    };
+    for (const p of ['anthropic', 'gemini', 'groq']) {
+      const next = MODEL_MIGRATIONS[state.models[p]];
+      if (next) { state.models[p] = next; localStorage.setItem(`jarvis_${p}_model`, next); }
+    }
+  }
 
   try {
     state.memories = JSON.parse(localStorage.getItem('jarvis_memories') || '[]');
@@ -1977,14 +2069,18 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   async function runToolLoop(adapter, model, providerName) {
     const collectedText = [];
     let safety = 0;
+    // Fixed for the whole turn: the system prompt and the starting point of the
+    // context. Inside the loop messages are only appended, never edited — Claude
+    // models that think reject replayed thinking after an edit.
+    const system = buildSystemPrompt();
+    const base = trimStartIndex(state.history);
 
     while (safety++ < 5) {
-      const trimmed = trimHistory(state.history);
       const result = await adapter.call({
         apiKey: state.keys[providerName],
         model,
-        messages: trimmed,
-        system: buildSystemPrompt(),
+        messages: state.history.slice(base),
+        system,
       });
 
       // Push assistant turn
@@ -2009,6 +2105,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         }
       }
 
+      if (result.stop_reason === 'refusal' && !collectedText.length) {
+        const msg = 'Na to ne mogu odgovoriti.';
+        collectedText.push(msg);
+        addMessage('assistant', msg, { provider: adapter.label });
+      }
       if (result.stop_reason !== 'tool_use' || toolResults.length === 0) break;
 
       // Send tool results back to close the loop (required by Claude and OpenAI protocols)
@@ -2023,6 +2124,18 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
 
     persistHistory();
     return collectedText.join(' ').trim();
+  }
+
+  function trimStartIndex(hist) {
+    if (hist.length <= 24) return 0;
+    let start = hist.length - 24;
+    while (start < hist.length) {
+      const m = hist[start];
+      const isToolResult = Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result');
+      if (m.role === 'user' && !isToolResult) break;
+      start++;
+    }
+    return start;
   }
 
   function trimHistory(hist) {
@@ -4101,31 +4214,22 @@ Rules:
   }
 
   async function callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': state.keys.anthropic,
-        'anthropic-version': ANTHROPIC_VERSION,
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: state.models.anthropic,
-        max_tokens: maxTokens || 400,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
-            { type: 'text', text: promptText },
-          ],
-        }],
-      }),
-    });
-    if (!res.ok) throw await httpError(res, 'Anthropic');
-    const data = await res.json();
-    trackUsage('anthropic', data.usage?.input_tokens, data.usage?.output_tokens);
-    return (data.content || []).map(b => b.text || '').join(' ').trim();
+    const model = state.models.anthropic;
+    const body = {
+      model,
+      max_tokens: anthropicThinks(model) ? Math.max(3000, maxTokens || 400) : (maxTokens || 400),
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
+          { type: 'text', text: promptText },
+        ],
+      }],
+    };
+    if (anthropicThinks(model)) body.output_config = { effort: 'low' }; // reading a photo needs little deliberation
+    const data = await anthropicPost(state.keys.anthropic, body, null);
+    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
   }
 
   async function callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens) {
@@ -4142,7 +4246,7 @@ Rules:
           ],
         }],
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { maxOutputTokens: maxTokens || 400, thinkingConfig: { thinkingLevel: 'low' } },
+        generationConfig: { maxOutputTokens: Math.max(1024, maxTokens || 400), thinkingConfig: { thinkingLevel: 'low' } },
       }),
     });
     if (!res.ok) throw await httpError(res, 'Gemini');
@@ -4393,6 +4497,7 @@ Rules:
     $('openrouterKey').value = state.keys.openrouter;
 
     $('anthropicModel').value = state.models.anthropic;
+    $('anthropicEffort').value = state.anthropicEffort;
     $('geminiModel').value = state.models.gemini;
     $('groqModel').value = state.models.groq;
     $('openrouterModel').value = state.models.openrouter;
@@ -4445,6 +4550,8 @@ Rules:
     state.keys.openrouter = $('openrouterKey').value.trim();
 
     state.models.anthropic = $('anthropicModel').value;
+    state.anthropicEffort = $('anthropicEffort').value;
+    localStorage.setItem('jarvis_anthropic_effort', state.anthropicEffort);
     state.models.gemini = $('geminiModel').value;
     state.models.groq = $('groqModel').value;
     state.models.openrouter = $('openrouterModel').value;
@@ -4564,6 +4671,7 @@ Rules:
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
+      'jarvis_anthropic_effort',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
