@@ -623,6 +623,23 @@
   .rz-chart-title { font-size: 11px; color: var(--text); margin-bottom: 6px; }
   .rz-chart svg { width: 100%; height: auto; display: block; }
 
+  /* Phone call card */
+  .call-btn {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    text-decoration: none; color: inherit; cursor: pointer;
+  }
+  .call-btn:active { background: rgba(255, 181, 71, 0.12); }
+  .call-icon {
+    width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid var(--gold); color: var(--gold);
+    display: grid; place-items: center; font-size: 20px;
+    box-shadow: 0 0 14px rgba(255, 181, 71, 0.35);
+  }
+  .call-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .call-name { font-size: 14px; color: var(--cyan-bright); }
+  .call-number { font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; }
+  .call-hint { padding: 0 16px 12px; font-size: 10px; color: var(--text-dim); }
+
   .warning {
     padding: 10px 12px;
     border: 1px solid rgba(255, 181, 71, 0.4);
@@ -941,14 +958,19 @@
       <input type="text" id="protocolNameInput" placeholder="npr. Jutro">
     </div>
     <div class="field">
-      <label>Protocol Prompt</label>
+      <label>Protocol Prompt (opcionalno ako je upisan broj)</label>
       <input type="text" id="protocolPromptInput" placeholder="npr. Reci mi kalendar za danas i jednu zanimljivu vijest.">
+    </div>
+    <div class="field">
+      <label>Broj za poziv (opcionalno)</label>
+      <input type="tel" id="protocolPhoneInput" placeholder="+385912345678">
+      <div class="field-hint" id="protocolStatus"></div>
     </div>
     <div class="btn-row" style="margin-top:0;">
       <button class="btn" type="button" id="addProtocolBtn">Add Protocol</button>
     </div>
     <div class="info-note">
-      Aktiviraj glasom: "Jarvise, pokreni protokol [ime]". Prompt može biti složena rečenica — Jarvis će sam iskoristiti kalendar, pretragu ili druge alate ako zatreba.
+      Aktiviraj glasom: "Jarvise, pokreni protokol [ime]". Prompt može biti složena rečenica — Jarvis će sam iskoristiti kalendar, pretragu ili druge alate ako zatreba. Ako je upisan broj, Jarvis nakon prompta otvara aplikaciju za pozive s tim brojem; poziv pokrećeš ti, zelenom tipkom.
     </div>
 
     <h3>Contacts</h3>
@@ -965,7 +987,7 @@
       <button class="btn" type="button" id="addContactBtn">Add Contact</button>
     </div>
     <div class="info-note">
-      Koristi se za "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
+      Koristi se za "nazovi [ime]" i "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
     </div>
 
     <h3>Personality</h3>
@@ -1213,6 +1235,7 @@ Tools available:
 - get_utility_prices — questions about current utility prices or fixed fees.
 - update_utility_price — the user wants to change a utility price or fee. Needs confirmation, like readings.
 - delete_last_meter_reading — the user wants to delete the latest meter reading (they enter a password on screen).
+- make_phone_call — the user asks you to call someone (nazovi, pozovi). It only opens the dialer with the number filled in; the user presses call. Never claim the call has started.
 - open_utilities_app — the user wants to see or open režije (table, entry form, charts, prices) on screen.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
 
@@ -1444,6 +1467,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       name: 'delete_last_meter_reading',
       description: 'Delete the most recent meter reading. The user must enter the delete password on screen.',
       input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'make_phone_call',
+      description: "Prepare a phone call: shows a call card and opens the phone's dialer with the number filled in. The user presses the call button themselves. Use a saved contact name; use phone_number only if the user said the digits explicitly.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          contact_name: { type: 'string', description: 'Name of a saved contact, as the user said it.' },
+          phone_number: { type: 'string', description: 'Digits the user dictated, only if no contact applies.' }
+        }
+      }
     },
     {
       name: 'open_utilities_app',
@@ -2370,9 +2404,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   function saveProtocols(list) {
     try { localStorage.setItem('jarvis_protocols', JSON.stringify(list)); } catch {}
   }
-  function addProtocol(name, prompt) {
+  function addProtocol(name, prompt, phone) {
     const list = loadProtocols();
-    list.push({ id: `proto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), prompt: prompt.trim() });
+    const p = { id: `proto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: name.trim(), prompt: (prompt || '').trim() };
+    if (phone) p.phone = phone.trim();
+    list.push(p);
     saveProtocols(list);
     state.protocols = list;
     renderProtocolsInSettings();
@@ -2392,7 +2428,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       return;
     }
     container.innerHTML = list.map(p => {
-      const preview = p.prompt.length > 60 ? p.prompt.slice(0, 60) + '…' : p.prompt;
+      const parts = [];
+      if (p.phone) parts.push('📞 ' + p.phone);
+      if (p.prompt) parts.push(p.prompt.length > 60 ? p.prompt.slice(0, 60) + '…' : p.prompt);
+      const preview = parts.join(' · ');
       return `<div class="reminder-item">
         <div><div>⚡ ${escapeHtml(p.name)}</div><div class="reminder-time">${escapeHtml(preview)}</div></div>
         <button data-id="${p.id}" class="reminder-delete" type="button">×</button>
@@ -2558,9 +2597,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     });
   }
   function findContactByName(name) {
-    const n = name.toLowerCase().trim();
+    const n = (name || '').toLowerCase().trim().replace(/[.!?,]+$/, '');
+    if (!n) return null;
     return state.contacts.find(c => c.name.toLowerCase() === n)
-      || state.contacts.find(c => c.name.toLowerCase().includes(n) || n.includes(c.name.toLowerCase()));
+      || state.contacts.find(c => c.name.toLowerCase().includes(n) || n.includes(c.name.toLowerCase()))
+      // Croatian cases change the ending ("Marka" → Marko, "mamu" → Mama): compare the stem.
+      || state.contacts.find(c => {
+        const a = c.name.toLowerCase().split(/\s+/)[0], b = n.split(/\s+/)[0];
+        const len = Math.max(3, Math.min(a.length, b.length) - 1);
+        return a.length >= 3 && b.length >= 3 && a.slice(0, len) === b.slice(0, len);
+      })
+      || null;
   }
   function buildMessageUrl(phone, message, channel) {
     const encodedMsg = encodeURIComponent(message);
@@ -3260,6 +3307,74 @@ Rules:
     await say(`Očitao sam ${what}. ${next}`);
   }
 
+  // ---------- Phone calls ----------
+  // A browser app cannot place a call by itself. It can open the phone's dialer
+  // with the number filled in; the user presses the green button.
+  let pendingCall = null; // number to dial once the current spoken reply ends
+
+  function isValidPhone(s) {
+    const t = String(s || '').trim();
+    return /^\+?[0-9][0-9 ()\-]{1,20}[0-9]$/.test(t) && t.replace(/\D/g, '').length >= 3;
+  }
+  function telHref(phone) {
+    const t = String(phone).trim();
+    return 'tel:' + (t.startsWith('+') ? '+' : '') + t.replace(/\D/g, '');
+  }
+  function renderCallCard(phone, label) {
+    const eh = emptyHint(); if (eh) eh.remove();
+    const card = document.createElement('div');
+    card.className = 'card card-call';
+    card.innerHTML = `<div class="card-header"><span class="card-header-icon">📞</span> POZIV</div>
+      <a class="call-btn" href="${telHref(phone)}">
+        <div class="call-icon">📞</div>
+        <div class="call-text"><span class="call-name"></span><span class="call-number"></span></div>
+      </a>
+      <div class="call-hint">Ako se aplikacija za pozive ne otvori sama, tapni karticu.</div>`;
+    card.querySelector('.call-name').textContent = label && label !== phone ? `Nazovi ${label}` : 'Nazovi';
+    card.querySelector('.call-number').textContent = phone;
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+    return card;
+  }
+  // Try to open the dialer straight away. Chrome may require a fresh tap for
+  // this; if it refuses, nothing breaks — the call card is still there.
+  function tryOpenDialer(phone) {
+    try {
+      const a = document.createElement('a');
+      a.href = telHref(phone);
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) { /* the card remains as the fallback */ }
+  }
+  async function placeCall(userText, phone, label, lang, spokenText) {
+    if (userText) addMessage('user', userText);
+    renderCallCard(phone, label);
+    const msg = spokenText || `Zovem ${label}.`;
+    addMessage('assistant', msg);
+    state.history.push({ role: 'user', content: userText || `Nazovi ${label}.` });
+    state.history.push({ role: 'assistant', content: msg });
+    persistHistory();
+    await speak(msg, lang); // speak first: the dialer takes over the screen
+    tryOpenDialer(phone);
+  }
+  function matchCallIntent(text) {
+    const m = /^(nazovi|pozovi|zovi|call|dial)\s+(mi\s+)?(.+?)[.!?]*$/i.exec((text || '').trim());
+    if (!m) return null;
+    const target = m[3].trim();
+    const c = findContactByName(target);
+    if (c) return { phone: c.phone, label: c.name };
+    if (isValidPhone(target)) return { phone: target, label: target };
+    return null; // unknown name — let the AI model handle it (it can ask for the number)
+  }
+  async function runProtocol(p, lang) {
+    if (p.prompt) await handleUserMessage(p.prompt, lang, { displayText: `⚡ ${p.name}` });
+    if (p.phone) {
+      await placeCall(p.prompt ? '' : `⚡ ${p.name}`, p.phone, p.name, lang, `Protokol ${p.name}: zovem ${p.phone}.`);
+    }
+  }
+
   // ---------- Single entry point for every recognised utterance ----------
   function rezijePanelIntent(text) {
     const t = (text || '').toLowerCase().trim().replace(/[.!?]+$/, '');
@@ -3291,7 +3406,9 @@ Rules:
     }
     if (isMeterIntent(t)) { handleMeterCapture(t, lang); return; }
     const protocol = matchProtocolIntent(t);
-    if (protocol) { handleUserMessage(protocol.prompt, lang, { displayText: `⚡ ${protocol.name}` }); return; }
+    if (protocol) { runProtocol(protocol, lang); return; }
+    const call = matchCallIntent(t);
+    if (call) { placeCall(t, call.phone, call.label, lang); return; }
     if (isDocumentIntent(t)) { handleCameraRequest(t, lang, { mode: 'document' }); return; }
     if (isCameraIntent(t)) { handleCameraRequest(t, lang); return; }
     handleUserMessage(t, lang);
@@ -3768,6 +3885,16 @@ Rules:
         }
         case 'delete_last_meter_reading':
           return await utilDeleteLast();
+        case 'make_phone_call': {
+          let phone = null, label = null;
+          const c = toolUse.input.contact_name ? findContactByName(toolUse.input.contact_name) : null;
+          if (c) { phone = c.phone; label = c.name; }
+          else if (toolUse.input.phone_number && isValidPhone(toolUse.input.phone_number)) { phone = toolUse.input.phone_number; label = phone; }
+          if (!phone) return `No saved contact or valid number for "${toolUse.input.contact_name || toolUse.input.phone_number || ''}". Tell the user to add the contact in Settings → Contacts, or to say the number.`;
+          renderCallCard(phone, label);
+          pendingCall = phone;
+          return `Call card shown for ${label}. The dialer opens right after you finish speaking; the user presses call themselves. Say only one short sentence, e.g. "Zovem ${label}."`;
+        }
         case 'open_utilities_app':
           openRezijePanel(toolUse.input.tab);
           return 'The režije panel is now open on screen.';
@@ -4471,6 +4598,11 @@ Rules:
       state.processing = false;
       if (reply) await speak(reply, lang); // speak()'s finally resumes wake word
       else { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); }
+      if (pendingCall) {
+        const phone = pendingCall;
+        pendingCall = null;
+        tryOpenDialer(phone);
+      }
       if (pendingMeterCapture) {
         const hint = pendingMeterCapture.hint;
         pendingMeterCapture = null;
@@ -4478,6 +4610,7 @@ Rules:
       }
     } catch (err) {
       pendingMeterCapture = null;
+      pendingCall = null;
       state.processing = false;
       addMessage('error', err.message);
       setState('error');
@@ -4728,7 +4861,7 @@ Rules:
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
-  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;
@@ -4839,10 +4972,18 @@ Rules:
   $('addProtocolBtn').addEventListener('click', () => {
     const name = $('protocolNameInput').value.trim();
     const prompt = $('protocolPromptInput').value.trim();
-    if (!name || !prompt) return;
-    addProtocol(name, prompt);
+    const phone = $('protocolPhoneInput').value.trim();
+    const status = $('protocolStatus');
+    status.style.color = 'var(--red)';
+    if (!name) { status.textContent = 'Upiši ime protokola.'; return; }
+    if (!prompt && !phone) { status.textContent = 'Upiši prompt, broj za poziv ili oboje.'; return; }
+    if (phone && !isValidPhone(phone)) { status.textContent = 'Broj smije sadržavati samo znamenke, razmake i + na početku.'; return; }
+    addProtocol(name, prompt, phone);
     $('protocolNameInput').value = '';
     $('protocolPromptInput').value = '';
+    $('protocolPhoneInput').value = '';
+    status.style.color = 'var(--gold)';
+    status.textContent = `Protokol "${name}" dodan.`;
   });
 
   // Provider tab switching
