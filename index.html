@@ -985,9 +985,11 @@
     </div>
     <div class="btn-row" style="margin-top:0;">
       <button class="btn" type="button" id="addContactBtn">Add Contact</button>
+      <button class="btn btn-secondary" type="button" id="importContactsBtn">📇 Uvezi iz imenika</button>
     </div>
+    <div class="field-hint" id="contactsStatus" style="margin-top:6px;"></div>
     <div class="info-note">
-      Koristi se za "nazovi [ime]" i "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
+      Kontakt dodaješ i glasom ("spremi kontakt Martina 091 234 5678") ili iz imenika telefona (odabereš jednog ili više). Koristi se za "nazovi [ime]" i "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
     </div>
 
     <h3>Personality</h3>
@@ -1235,6 +1237,7 @@ Tools available:
 - get_utility_prices — questions about current utility prices or fixed fees.
 - update_utility_price — the user wants to change a utility price or fee. Needs confirmation, like readings.
 - delete_last_meter_reading — the user wants to delete the latest meter reading (they enter a password on screen).
+- save_contact — the user wants to save someone's phone number as a contact. It is not saved until the user confirms.
 - make_phone_call — the user asks you to call someone (nazovi, pozovi). It only opens the dialer with the number filled in; the user presses call. Never claim the call has started.
 - open_utilities_app — the user wants to see or open režije (table, entry form, charts, prices) on screen.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
@@ -1467,6 +1470,18 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       name: 'delete_last_meter_reading',
       description: 'Delete the most recent meter reading. The user must enter the delete password on screen.',
       input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'save_contact',
+      description: 'Save a name and phone number as a Jarvis contact (for calls and messages). Not saved until the user confirms by saying "potvrdi" or tapping Save. Use the name in nominative case (Martina, not Martinu).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Contact name in nominative case.' },
+          phone: { type: 'string', description: 'Phone number as digits, optional leading +.' }
+        },
+        required: ['name', 'phone']
+      }
     },
     {
       name: 'make_phone_call',
@@ -2573,6 +2588,14 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     state.contacts = list;
     renderContactsInSettings();
   }
+  function updateContact(id, phone) {
+    const list = loadContacts();
+    const c = list.find(x => x.id === id);
+    if (c) c.phone = phone;
+    saveContacts(list);
+    state.contacts = list;
+    renderContactsInSettings();
+  }
   function removeContact(id) {
     const list = loadContacts().filter(c => c.id !== id);
     saveContacts(list);
@@ -2984,11 +3007,11 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   }
 
   // ---------- Cards ----------
-  function utilCard(existing, title, bodyHtml, buttons) {
+  function utilCard(existing, title, bodyHtml, buttons, icon) {
     const eh = emptyHint(); if (eh) eh.remove();
     const card = (existing && existing.isConnected) ? existing : document.createElement('div');
     card.className = 'card card-util';
-    card.innerHTML = `<div class="card-header"><span class="card-header-icon">⌂</span> ${title}</div><div class="util-body">${bodyHtml}</div>`
+    card.innerHTML = `<div class="card-header"><span class="card-header-icon">${icon || '⌂'}</span> ${title}</div><div class="util-body">${bodyHtml}</div>`
       + (buttons && buttons.length ? `<div class="util-actions"></div>` : '');
     if (buttons && buttons.length) {
       const bar = card.querySelector('.util-actions');
@@ -3163,10 +3186,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (!cancelable) return false;
     const t = text.trim().toLowerCase().replace(/[.!?,]+$/, '');
     if (t.length > 40) return false;
-    if (confirmable && /^(da|potvrdi|potvrđujem|potvrdjujem|spremi|spremi to|može|moze|u redu|ok|okej|yes|confirm|save)\b/.test(t)) {
+    if (confirmable && /^(da|potvrdi|potvrđujem|potvrdjujem|spremi|može|moze|u redu|ok|okej|yes|confirm|save)(\s+(to|molim|sada|odmah|please))?$/.test(t)) {
       utilConfirmPending(lang, text.trim()); return true;
     }
-    if (/^(ne|odustani|poništi|ponisti|nemoj|otkaži|otkazi|cancel|no)\b/.test(t)) {
+    if (/^(ne|odustani|poništi|ponisti|nemoj|otkaži|otkazi|cancel|no)(\s+(hvala|to|molim|thanks))?$/.test(t)) {
       utilCancelPending(lang, text.trim()); return true;
     }
     return false;
@@ -3348,7 +3371,11 @@ Rules:
       a.remove();
     } catch (e) { /* the card remains as the fallback */ }
   }
-  async function placeCall(userText, phone, label, lang, spokenText) {
+  async function placeCall(userText, phone, label, lang, spokenText, opts = {}) {
+    // Immediate: open the dialer before anything else — the sooner after the
+    // mic tap, the likelier Chrome lets it open on its own. No speech, so the
+    // voice doesn't talk over the dialer.
+    if (opts.immediate) tryOpenDialer(phone);
     if (userText) addMessage('user', userText);
     renderCallCard(phone, label);
     const msg = spokenText || `Zovem ${label}.`;
@@ -3356,6 +3383,7 @@ Rules:
     state.history.push({ role: 'user', content: userText || `Nazovi ${label}.` });
     state.history.push({ role: 'assistant', content: msg });
     persistHistory();
+    if (opts.immediate) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; }
     await speak(msg, lang); // speak first: the dialer takes over the screen
     tryOpenDialer(phone);
   }
@@ -3371,8 +3399,146 @@ Rules:
   async function runProtocol(p, lang) {
     if (p.prompt) await handleUserMessage(p.prompt, lang, { displayText: `⚡ ${p.name}` });
     if (p.phone) {
-      await placeCall(p.prompt ? '' : `⚡ ${p.name}`, p.phone, p.name, lang, `Protokol ${p.name}: zovem ${p.phone}.`);
+      await placeCall(p.prompt ? '' : `⚡ ${p.name}`, p.phone, p.name, lang, `Protokol ${p.name}: zovem ${p.phone}.`, { immediate: true });
     }
+  }
+
+  // ---------- Contacts by voice and from the phone's address book ----------
+  let pendingContact = null; // { name, phone, replaceId, oldPhone, createdAt }
+  let contactCard = null;
+  const CONTACT_TTL = 5 * 60 * 1000;
+  const DIGIT_WORDS = {
+    nula: '0', jedan: '1', jedna: '1', jedno: '1', dva: '2', dvije: '2', tri: '3', četiri: '4', cetiri: '4',
+    pet: '5', šest: '6', sest: '6', sedam: '7', osam: '8', devet: '9',
+    zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9',
+  };
+  const NAME_FILLERS = new Set(['broj', 'brojem', 'telefon', 'telefonski', 'mobitel', 'mobitela', 'je', 's', 'sa', 'na', 'za', 'od', 'pod', 'imenom', 'ime', 'kontakt', 'number', 'phone', 'is', 'with', 'named', 'i', 'mu', 'joj']);
+
+  // "nula devet jedan 234 56 78" / "plus 385 91 ..." → "0912345678" / "+38591..."
+  function spokenToPhone(s) {
+    const toks = String(s || '').toLowerCase().replace(/[,;]/g, ' ').split(/\s+/).filter(Boolean)
+      .map(w => (w === 'plus' ? '+' : (DIGIT_WORDS[w] ?? w)));
+    const joined = toks.join(' ');
+    const m = joined.match(/\+?\s*\d[\d\s\-()/.]*/);
+    if (!m) return null;
+    const plus = m[0].trim().startsWith('+');
+    const digits = m[0].replace(/\D/g, '');
+    if (digits.length < 3 || digits.length > 15) return null;
+    return (plus ? '+' : '') + digits;
+  }
+  function cleanContactName(s) {
+    return String(s || '').split(/\s+/).filter(w => w && !NAME_FILLERS.has(w.toLowerCase()) && !/\d/.test(w))
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').trim();
+  }
+  function isDigitToken(w) { const x = w.toLowerCase(); return /^\+?\d/.test(x) || x === 'plus' || x in DIGIT_WORDS; }
+  // "spremi kontakt Martina 091 234 5678" → { name: 'Martina', phone: '0912345678' }
+  function matchSaveContactIntent(text) {
+    const m = /^(spremi|dodaj|zapamti|upiši|upisi|save|add)\s+(mi\s+)?(novi\s+)?(kontakt|broj|contact|number)\s+(.+?)[.!?]*$/i.exec((text || '').trim());
+    if (!m) return null;
+    const tokens = m[5].split(/\s+/);
+    const idx = tokens.findIndex(isDigitToken);
+    if (idx === -1) return { name: cleanContactName(m[5]), phone: null };
+    return { name: cleanContactName(tokens.slice(0, idx).join(' ')), phone: spokenToPhone(tokens.slice(idx).join(' ')) };
+  }
+  function isImportContactsIntent(text) {
+    return /^(uvezi|dodaj|učitaj|ucitaj|import)\s+(mi\s+)?(kontakt\w*)\s+(iz\s+)?(imenika|telefona|mobitela)|^(import|add)\s+contacts?\s+from/i.test((text || '').trim());
+  }
+  function spellDigits(phone) { return phone.replace('+', 'plus ').split('').filter(ch => /\d/.test(ch)).join(' '); }
+
+  function proposeContact(name, phone) {
+    const existing = state.contacts.find(c => c.name.toLowerCase() === name.toLowerCase());
+    pendingContact = { name, phone, replaceId: existing ? existing.id : null, oldPhone: existing ? existing.phone : null, createdAt: Date.now() };
+    let body = utilRow('Ime', name) + utilRow('Broj', phone);
+    if (existing) body += `<div class="util-warning">Kontakt već postoji s brojem ${escapeHtml(existing.phone)} — spremanjem se broj zamjenjuje.</div>`;
+    contactCard = utilCard(null, 'NOVI KONTAKT', body, [
+      { label: '✓ Spremi', cls: 'util-save', onClick: () => commitPendingContact(currentLang(), '') },
+      { label: '✕', cls: 'util-cancel', onClick: () => cancelPendingContact(currentLang(), '') },
+    ], '👤');
+    return pendingContact;
+  }
+  function contactPending() {
+    if (pendingContact && Date.now() - pendingContact.createdAt > CONTACT_TTL) pendingContact = null;
+    return !!pendingContact;
+  }
+  async function commitPendingContact(lang, spokenText) {
+    if (!contactPending() || state.processing || state.speaking) return;
+    const pc = pendingContact; pendingContact = null;
+    if (pc.replaceId) updateContact(pc.replaceId, pc.phone); else addContact(pc.name, pc.phone);
+    const msg = `Kontakt ${pc.name} je spremljen. Reci "nazovi ${pc.name}" kad ga želiš nazvati.`;
+    utilFinalizeCard(contactCard, 'NOVI KONTAKT', '✓ ' + msg);
+    await localReply(spokenText || 'Potvrdi.', msg, lang, !spokenText);
+  }
+  async function cancelPendingContact(lang, spokenText) {
+    if (!contactPending() || state.processing || state.speaking) return;
+    pendingContact = null;
+    utilFinalizeCard(contactCard, 'NOVI KONTAKT', 'Odustano — kontakt nije spremljen.');
+    await localReply(spokenText || 'Odustani.', 'U redu, kontakt nije spremljen.', lang, !spokenText);
+  }
+  function contactHandleVoiceConfirm(text, lang) {
+    if (!contactPending()) return false;
+    const t = text.trim().toLowerCase().replace(/[.!?,]+$/, '');
+    if (t.length > 40) return false;
+    if (/^(da|potvrdi|potvrđujem|potvrdjujem|spremi|može|moze|u redu|ok|okej|yes|confirm|save)(\s+(to|molim|sada|odmah|please))?$/.test(t)) { commitPendingContact(lang, text.trim()); return true; }
+    if (/^(ne|odustani|poništi|ponisti|nemoj|otkaži|otkazi|cancel|no)(\s+(hvala|to|molim|thanks))?$/.test(t)) { cancelPendingContact(lang, text.trim()); return true; }
+    return false;
+  }
+  async function voiceSaveContact(t, parsed, lang) {
+    if (!parsed.name || !parsed.phone) {
+      await localReply(t, 'Nisam razumio ime ili broj. Reci na primjer: spremi kontakt Martina, nula devet jedan, dva tri četiri, pet šest sedam osam.', lang);
+      return;
+    }
+    addMessage('user', t);
+    const pc = proposeContact(parsed.name, parsed.phone);
+    const msg = `Spremam ${pc.name}, broj ${spellDigits(pc.phone)}.${pc.replaceId ? ' Time zamjenjujem postojeći broj.' : ''} Reci potvrdi ili odustani.`;
+    addMessage('assistant', msg);
+    state.history.push({ role: 'user', content: t });
+    state.history.push({ role: 'assistant', content: msg });
+    persistHistory();
+    await speak(msg, lang);
+  }
+
+  // Chrome on Android: the Contact Picker lets the user choose entries from the
+  // phone's address book. It must be opened by a tap.
+  function contactPickerSupported() { return !!(navigator.contacts && navigator.contacts.select); }
+  async function importFromAddressBook() {
+    if (!contactPickerSupported()) throw new Error('Ovaj preglednik nema pristup imeniku. Radi u Chromeu na Androidu, preko https adrese.');
+    const picked = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+    let added = 0, updated = 0, skipped = 0;
+    for (const p of picked || []) {
+      const name = String((p.name && p.name[0]) || '').trim();
+      const raw = String((p.tel && p.tel[0]) || '').trim();
+      const phone = (raw.startsWith('+') ? '+' : '') + raw.replace(/\D/g, '');
+      if (!name || !/^\+?\d{3,15}$/.test(phone)) { skipped++; continue; }
+      const existing = state.contacts.find(c => c.name.toLowerCase() === name.toLowerCase());
+      if (!existing) { addContact(name, phone); added++; }
+      else if (existing.phone.replace(/\D/g, '') !== phone.replace(/\D/g, '')) { updateContact(existing.id, phone); updated++; }
+      else skipped++;
+    }
+    return { added, updated, skipped, total: (picked || []).length };
+  }
+  function importSummary(r) {
+    if (!r.total) return 'Nijedan kontakt nije odabran.';
+    const parts = [];
+    if (r.added) parts.push(`dodano ${r.added}`);
+    if (r.updated) parts.push(`ažurirano ${r.updated}`);
+    if (r.skipped) parts.push(`preskočeno ${r.skipped}`);
+    return 'Uvoz iz imenika: ' + parts.join(', ') + '.';
+  }
+  async function voiceImportContacts(t, lang) {
+    addMessage('user', t);
+    if (!contactPickerSupported()) { await localReply(t, 'Ovaj preglednik nema pristup imeniku telefona. Radi u Chromeu na Androidu.', lang, true); return; }
+    // The picker needs a tap, so offer a button instead of opening it directly.
+    const card = utilCard(null, 'IMENIK', `<div class="util-row"><span class="util-l">Odaberi jednog ili više kontakata iz imenika telefona.</span></div>`, [
+      { label: '📇 Otvori imenik', cls: 'util-save', onClick: async () => {
+        try {
+          const r = await importFromAddressBook();
+          const msg = importSummary(r);
+          utilFinalizeCard(card, 'IMENIK', '✓ ' + msg);
+          await localReply('Uvezi kontakte iz imenika.', msg, currentLang(), true);
+        } catch (e) { utilFinalizeCard(card, 'IMENIK', e.message); }
+      } },
+    ], '📇');
+    await localReply(t, 'Tapni Otvori imenik i odaberi kontakte.', lang, true);
   }
 
   // ---------- Single entry point for every recognised utterance ----------
@@ -3385,10 +3551,10 @@ Rules:
     const tab = /graf|chart/.test(rest) ? 'grafovi' : /cijen|price/.test(rest) ? 'cijene' : /unos|upis|entry|očitanj|ocitanj/.test(rest) ? 'unos' : /tablic|table/.test(rest) ? 'tablica' : null;
     return { action: 'open', tab };
   }
-  async function localReply(userText, reply, lang) {
-    addMessage('user', userText);
+  async function localReply(userText, reply, lang, skipUserBubble) {
+    if (userText && !skipUserBubble) addMessage('user', userText);
     addMessage('assistant', reply);
-    state.history.push({ role: 'user', content: userText });
+    state.history.push({ role: 'user', content: userText || '(radnja u sučelju)' }); // never an empty message
     state.history.push({ role: 'assistant', content: reply });
     persistHistory();
     await speak(reply, lang);
@@ -3397,7 +3563,13 @@ Rules:
   function routeUtterance(text, lang) {
     const t = (text || '').trim();
     if (!t) return;
+    if (contactHandleVoiceConfirm(t, lang)) return;
     if (utilHandleVoiceConfirm(t, lang)) return;
+    if (isImportContactsIntent(t)) { voiceImportContacts(t, lang); return; }
+    const newContact = matchSaveContactIntent(t);
+    // Only handled locally when a number was actually spoken; otherwise the AI model
+    // takes it (it can ask for the number, e.g. "zapamti mi broj od susjeda").
+    if (newContact && newContact.phone) { voiceSaveContact(t, newContact, lang); return; }
     const panel = rezijePanelIntent(t);
     if (panel) {
       if (panel.action === 'close') { closeRezijePanel(); localReply(t, 'Zatvaram režije.', lang); }
@@ -3408,7 +3580,7 @@ Rules:
     const protocol = matchProtocolIntent(t);
     if (protocol) { runProtocol(protocol, lang); return; }
     const call = matchCallIntent(t);
-    if (call) { placeCall(t, call.phone, call.label, lang); return; }
+    if (call) { placeCall(t, call.phone, call.label, lang, null, { immediate: true }); return; }
     if (isDocumentIntent(t)) { handleCameraRequest(t, lang, { mode: 'document' }); return; }
     if (isCameraIntent(t)) { handleCameraRequest(t, lang); return; }
     handleUserMessage(t, lang);
@@ -3885,6 +4057,13 @@ Rules:
         }
         case 'delete_last_meter_reading':
           return await utilDeleteLast();
+        case 'save_contact': {
+          const phone = spokenToPhone(String(toolUse.input.phone || ''));
+          const name = cleanContactName(String(toolUse.input.name || ''));
+          if (!name || !phone) return 'Missing or invalid name or phone number. Ask the user to repeat, e.g. "spremi kontakt Martina 091 234 5678".';
+          const pc = proposeContact(name, phone);
+          return `Proposed contact ${pc.name}, ${pc.phone}${pc.replaceId ? ' (replaces the existing number)' : ''}. NOT saved yet — read the number back digit by digit and ask the user to say "potvrdi" or "odustani".`;
+        }
         case 'make_phone_call': {
           let phone = null, label = null;
           const c = toolUse.input.contact_name ? findContactByName(toolUse.input.contact_name) : null;
@@ -4923,6 +5102,13 @@ Rules:
     addContact(name, phone);
     $('contactNameInput').value = '';
     $('contactPhoneInput').value = '';
+  });
+  $('importContactsBtn').addEventListener('click', async () => {
+    const st = $('contactsStatus');
+    try {
+      const r = await importFromAddressBook();
+      st.style.color = 'var(--gold)'; st.textContent = importSummary(r);
+    } catch (e) { st.style.color = 'var(--red)'; st.textContent = e.message; }
   });
   $('clearExpensesBtn').addEventListener('click', async () => {
     if (!state.expenses.length) return;
