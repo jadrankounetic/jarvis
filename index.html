@@ -757,6 +757,7 @@
 <div class="modal-backdrop" id="settingsModal">
   <div class="modal">
     <h2>System Configuration</h2>
+    <div class="field-hint" id="versionLabel" style="margin:-10px 0 14px;"></div>
 
     <div class="warning">
       ⚠ API ključevi se spremaju samo na ovom uređaju. Nemoj dijeliti URL ako si spremio ključeve.
@@ -1104,6 +1105,17 @@
       Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio, Groq Console...).
     </div>
 
+    <h3>Ideje za nadogradnju</h3>
+    <div id="ideasList" class="reminders-list"></div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn btn-secondary" type="button" id="copyIdeasBtn">Kopiraj sve</button>
+      <button class="btn btn-small-danger" type="button" id="clearIdeasBtn">Obriši sve</button>
+    </div>
+    <div class="field-hint" id="ideasStatus" style="margin-top:6px;"></div>
+    <div class="info-note">
+      Glasom: "Jarvis, nova ideja: …" sprema ideju s datumom. "Pročitaj moje ideje" ih izgovori. "Kopiraj sve" ih stavlja u međuspremnik, spremne za lijepljenje u razgovor u kojem se Jarvis razvija.
+    </div>
+
     <h3>Backup</h3>
     <div class="btn-row" style="margin-top:0;">
       <button class="btn" type="button" id="exportBackupBtn">Export Backup</button>
@@ -1111,7 +1123,7 @@
     </div>
     <input type="file" id="importBackupFile" accept="application/json" style="display:none;">
     <div class="info-note">
-      Backup uključuje razgovor, pamćenje, protokole, kontakte, troškove i podsjetnike — NE uključuje API ključeve (njih upiši ručno nakon vraćanja, iz sigurnosnih razloga).
+      Backup uključuje razgovor, pamćenje, protokole, kontakte, troškove, ideje i podsjetnike — NE uključuje API ključeve (njih upiši ručno nakon vraćanja, iz sigurnosnih razloga).
     </div>
 
     <h3>Language & Voice</h3>
@@ -1200,6 +1212,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
+  const JARVIS_VERSION = '8.5';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -2805,6 +2818,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       protocols: state.protocols,
       contacts: state.contacts,
       expenses: state.expenses,
+      ideas: loadIdeas(),
       reminders: loadReminders(),
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -2827,6 +2841,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         if (Array.isArray(data.memories)) { state.memories = data.memories; saveMemories(state.memories); }
         if (Array.isArray(data.protocols)) { state.protocols = data.protocols; saveProtocols(state.protocols); }
         if (Array.isArray(data.contacts)) { state.contacts = data.contacts; saveContacts(state.contacts); }
+        if (Array.isArray(data.ideas)) { saveIdeas(data.ideas); renderIdeasInSettings(); }
         if (Array.isArray(data.expenses)) { state.expenses = data.expenses; saveExpenses(state.expenses); renderExpensesInSettings(); }
         if (Array.isArray(data.reminders)) {
           saveReminders(data.reminders);
@@ -3541,6 +3556,77 @@ Rules:
     await localReply(t, 'Tapni Otvori imenik i odaberi kontakte.', lang, true);
   }
 
+  // ---------- Ideas notebook ("Jarvis, nova ideja: …") ----------
+  // Ideas are only written down here; they never change Jarvis's code.
+  let pendingIdeaUntil = 0; // after "nova ideja" with nothing else, the next utterance is the idea
+
+  function loadIdeas() {
+    try { return JSON.parse(localStorage.getItem('jarvis_ideas') || '[]'); } catch { return []; }
+  }
+  function saveIdeas(list) {
+    try { localStorage.setItem('jarvis_ideas', JSON.stringify(list)); } catch {}
+  }
+  function addIdea(text) {
+    const clean = String(text || '').trim().replace(/\s+/g, ' ');
+    if (!clean) return null;
+    const idea = { id: `idea_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, text: clean.charAt(0).toUpperCase() + clean.slice(1), timestamp: Date.now() };
+    const list = loadIdeas(); list.push(idea); saveIdeas(list);
+    renderIdeasInSettings();
+    return idea;
+  }
+  function removeIdea(id) { saveIdeas(loadIdeas().filter(i => i.id !== id)); renderIdeasInSettings(); }
+  function ideaDate(ts) {
+    const d = new Date(ts);
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}.`;
+  }
+  function renderIdeasInSettings() {
+    const el = $('ideasList');
+    if (!el) return;
+    const list = loadIdeas();
+    el.innerHTML = list.length
+      ? list.map(i => `<div class="reminder-item"><div><div>💡 ${escapeHtml(i.text)}</div><div class="reminder-time">${ideaDate(i.timestamp)}</div></div>
+          <button data-id="${i.id}" class="reminder-delete" type="button" aria-label="Obriši ideju">×</button></div>`).join('')
+      : '<div class="reminders-empty">Još nema ideja. Reci "Jarvis, nova ideja: …".</div>';
+    el.querySelectorAll('.reminder-delete').forEach(btn => btn.addEventListener('click', async () => {
+      if (await requirePassword('Obrisati ovu ideju?')) removeIdea(btn.dataset.id);
+    }));
+  }
+  function ideasWord(n) { // 1 ideju, 2–4 ideje, 5+ ideja (11–14 uvijek "ideja")
+    const d = n % 10, h = n % 100;
+    if (d === 1 && h !== 11) return 'ideju';
+    if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return 'ideje';
+    return 'ideja';
+  }
+  function ideasAsText() {
+    const list = loadIdeas();
+    return `Ideje za nadogradnju Jarvisa (${list.length}):\n` + list.map((i, n) => `${n + 1}. [${ideaDate(i.timestamp)}] ${i.text}`).join('\n');
+  }
+  function matchIdeaIntent(text) {
+    const m = /^nova\s+ideja\b[\s,.:;!-]*(.*)$/i.exec(text.trim());
+    return m ? { text: m[1].replace(/[.!?]+$/, '').trim() } : null;
+  }
+  function isReadIdeasIntent(text) {
+    return /^(pročitaj|procitaj|reci|koje su|nabroji)\s+(mi\s+)?(moje\s+|sve\s+)?ideje\b/i.test(text.trim());
+  }
+  async function voiceSaveIdea(userText, ideaText, lang) {
+    const idea = addIdea(ideaText);
+    addMessage('user', userText);
+    utilCard(null, 'NOVA IDEJA', `<div class="util-row"><span class="util-v" style="text-align:left;">${escapeHtml(idea.text)}</span></div>`
+      + `<div class="util-row"><span class="util-l">${ideaDate(idea.timestamp)} · spremljeno u Settings → Ideje za nadogradnju</span></div>`, [], '💡');
+    await localReply(userText, `Zapisao sam ideju. Ukupno ih imaš ${loadIdeas().length}.`, lang, true);
+  }
+  async function voiceAskForIdea(userText, lang) {
+    pendingIdeaUntil = Date.now() + 60000;
+    await localReply(userText, 'Slušam, izgovori ideju.', lang);
+    setTimeout(() => { if (Date.now() < pendingIdeaUntil && !state.recognizing && !state.processing && !state.speaking) startListening(); }, 250);
+  }
+  async function voiceReadIdeas(userText, lang) {
+    const list = loadIdeas();
+    const msg = !list.length ? 'Nemaš spremljenih ideja.'
+      : `Imaš ${list.length} ${ideasWord(list.length)}. ` + list.map((i, n) => `${n + 1}. ${i.text}.`).join(' ');
+    await localReply(userText, msg, lang);
+  }
+
   // ---------- Single entry point for every recognised utterance ----------
   function rezijePanelIntent(text) {
     const t = (text || '').toLowerCase().trim().replace(/[.!?]+$/, '');
@@ -3561,8 +3647,18 @@ Rules:
   }
 
   function routeUtterance(text, lang) {
-    const t = (text || '').trim();
-    if (!t) return;
+    const raw = (text || '').trim();
+    if (!raw) return;
+    // "Jarvis, nazovi Martinu" said after tapping the mic: the name is not part of the command.
+    const t = raw.replace(/^jarvis\w*[\s,.:;!-]+/i, '').trim() || raw;
+    if (pendingIdeaUntil && Date.now() < pendingIdeaUntil) {
+      pendingIdeaUntil = 0;
+      if (/^(odustani|ne|ništa|nista|cancel)[.!]?$/i.test(t)) { localReply(t, 'U redu, ništa nisam zapisao.', lang); return; }
+      voiceSaveIdea(t, t, lang); return;
+    }
+    const idea = matchIdeaIntent(t);
+    if (idea) { idea.text ? voiceSaveIdea(t, idea.text, lang) : voiceAskForIdea(t, lang); return; }
+    if (isReadIdeasIntent(t)) { voiceReadIdeas(t, lang); return; }
     if (contactHandleVoiceConfirm(t, lang)) return;
     if (utilHandleVoiceConfirm(t, lang)) return;
     if (isImportContactsIntent(t)) { voiceImportContacts(t, lang); return; }
@@ -4849,6 +4945,9 @@ Rules:
     renderContactsInSettings();
     renderExpensesInSettings();
     renderUsageStats();
+    renderIdeasInSettings();
+    $('versionLabel').textContent = `Verzija ${JARVIS_VERSION}`;
+    $('ideasStatus').textContent = '';
 
     $('settingsModal').dataset.open = 'true';
   }
@@ -4983,7 +5082,7 @@ Rules:
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
-      'jarvis_anthropic_effort',
+      'jarvis_anthropic_effort', 'jarvis_ideas',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
@@ -5102,6 +5201,19 @@ Rules:
     addContact(name, phone);
     $('contactNameInput').value = '';
     $('contactPhoneInput').value = '';
+  });
+  $('copyIdeasBtn').addEventListener('click', async () => {
+    const st = $('ideasStatus');
+    if (!loadIdeas().length) { st.style.color = 'var(--text-dim)'; st.textContent = 'Nema ideja za kopiranje.'; return; }
+    try {
+      await navigator.clipboard.writeText(ideasAsText());
+      st.style.color = 'var(--gold)'; st.textContent = 'Kopirano — zalijepi u razgovor u kojem se Jarvis razvija.';
+    } catch (e) { st.style.color = 'var(--red)'; st.textContent = 'Kopiranje nije uspjelo: ' + e.message; }
+  });
+  $('clearIdeasBtn').addEventListener('click', async () => {
+    if (!loadIdeas().length) return;
+    if (!(await requirePassword('Obrisati sve ideje?'))) return;
+    saveIdeas([]); renderIdeasInSettings();
   });
   $('importContactsBtn').addEventListener('click', async () => {
     const st = $('contactsStatus');

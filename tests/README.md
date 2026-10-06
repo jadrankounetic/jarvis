@@ -21,3 +21,4 @@ npm test
 | `models.test.js` | Claude Opus 5.5 pravila, zamjena zastarjelih modela, Haiku, Qwen, Gemini |
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
+| `ideas.test.js` | Bilježnica ideja, "Jarvis," ispred naredbi, broj verzije |
