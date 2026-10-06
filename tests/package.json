@@ -1,0 +1,7 @@
+{
+  "name": "jarvis-tests",
+  "private": true,
+  "description": "Automatske provjere za J.A.R.V.I.S. (index.html) u simuliranom pregledniku",
+  "scripts": { "test": "node run-all.js" },
+  "devDependencies": { "jsdom": "^24.0.0" }
+}
