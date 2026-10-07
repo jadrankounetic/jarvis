@@ -22,4 +22,6 @@ npm test
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
 | `ideas.test.js` | Bilježnica ideja, "Jarvis," ispred naredbi, broj verzije |
+| `household.test.js` | Popis za kupovinu, garancije, važni datumi, dnevni podsjetnici, podijeljeni tekst/slika/PDF |
+| `sw.test.js` | Servisni program za "Podijeli s Jarvisom" |
 | `settings-voice.test.js` | Teme boja, postavke glasom, alat change_setting, bez "glumljenja" promjena |

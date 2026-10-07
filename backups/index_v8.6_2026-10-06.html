@@ -7,9 +7,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>J.A.R.V.I.S.</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
@@ -1139,28 +1136,6 @@
       Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio, Groq Console...).
     </div>
 
-    <h3>Popis za kupovinu</h3>
-    <div id="shoppingList" class="reminders-list"></div>
-    <div class="btn-row danger-row" style="margin-top:0;">
-      <button class="btn btn-small-danger" type="button" id="shoppingClearDoneBtn">Ukloni kupljeno</button>
-      <button class="btn btn-small-danger" type="button" id="shoppingClearAllBtn">Očisti popis</button>
-    </div>
-    <div class="info-note">Glasom: "dodaj mlijeko i jaja na popis", "kupio sam jaja", "makni mlijeko s popisa", "što imam na popisu", "pošalji popis Martini". Tap na stavku označava je kao kupljenu.</div>
-
-    <h3>Garancije</h3>
-    <div id="warrantiesList" class="reminders-list"></div>
-    <div class="info-note">Glasom: "slikaj garanciju" (slikaš račun ili jamstveni list), "koje garancije imam", "do kada vrijedi garancija za perilicu". Mjesec dana prije isteka Jarvis podsjeti. Sliku računa čuvaj i u galeriji — Jarvis pamti samo podatke.</div>
-
-    <h3>Važni datumi</h3>
-    <div id="datesList" class="reminders-list"></div>
-    <div class="info-note">Glasom: "zapamti da Martina ima rođendan 12. svibnja", "zapamti da Ivan ima imendan 24. lipnja", "koji rođendani su uskoro". Tjedan dana prije i na sam dan Jarvis podsjeti; na dan rođendana nudi gotovu čestitku.</div>
-
-    <h3>Aplikacija</h3>
-    <div class="btn-row" style="margin-top:0;">
-      <button class="btn" type="button" id="installAppBtn" style="display:none;">📲 Instaliraj Jarvisa</button>
-    </div>
-    <div class="info-note" id="installHint">Instaliran Jarvis pojavljuje se u Androidovom izborniku <b>Dijeli</b> (tekst, poveznice, slike, PDF). U Chromeu: ⋮ → <b>Instaliraj aplikaciju</b> (ili <b>Dodaj na početni zaslon</b> → Instaliraj). Staru ikonu Jarvisa s početnog zaslona tada možeš obrisati.</div>
-
     <h3>Ideje za nadogradnju</h3>
     <div id="ideasList" class="reminders-list"></div>
     <div class="btn-row" style="margin-top:0;">
@@ -1179,7 +1154,7 @@
     </div>
     <input type="file" id="importBackupFile" accept="application/json" style="display:none;">
     <div class="info-note">
-      Backup uključuje razgovor, pamćenje, protokole, kontakte, troškove, ideje, popis za kupovinu, garancije, važne datume i podsjetnike — NE uključuje API ključeve (njih upiši ručno nakon vraćanja, iz sigurnosnih razloga).
+      Backup uključuje razgovor, pamćenje, protokole, kontakte, troškove, ideje i podsjetnike — NE uključuje API ključeve (njih upiši ručno nakon vraćanja, iz sigurnosnih razloga).
     </div>
 
     <h3>Language & Voice</h3>
@@ -1268,7 +1243,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '8.7';
+  const JARVIS_VERSION = '8.6';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1306,9 +1281,6 @@ Tools available:
 - get_utility_prices — questions about current utility prices or fixed fees.
 - update_utility_price — the user wants to change a utility price or fee. Needs confirmation, like readings.
 - delete_last_meter_reading — the user wants to delete the latest meter reading (they enter a password on screen).
-- shopping_list — the shopping list (popis za kupovinu): add, remove, mark bought, read, clear, send to a contact.
-- save_warranty / get_warranties — product warranties (garancije): save dictated details, list them, answer "until when is X under warranty".
-- save_important_date / get_important_dates — birthdays, name days, anniversaries. When the user asks for a gift idea, give one concrete suggestion.
 - change_setting — the user wants to change your theme/colours, tone, Claude model, thinking speed, provider, auto-routing, wake word, continuous conversation, boot animation, morning briefing or voice.
 - save_idea — save an idea for a future upgrade (after the user agrees, or when they ask you to note an idea).
 - save_contact — the user wants to save someone's phone number as a contact. It is not saved until the user confirms.
@@ -1544,57 +1516,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     {
       name: 'delete_last_meter_reading',
       description: 'Delete the most recent meter reading. The user must enter the delete password on screen.',
-      input_schema: { type: 'object', properties: {} }
-    },
-    {
-      name: 'shopping_list',
-      description: 'Manage the shopping list. add/remove/bought take item names; list reads it; clear asks the user to confirm; send prepares a WhatsApp/SMS message with the list for a saved contact (the user taps to send).',
-      input_schema: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', enum: ['add', 'remove', 'bought', 'list', 'clear', 'send'] },
-          items: { type: 'array', items: { type: 'string' }, description: 'Item names, each with optional quantity, e.g. "2 kg brašna".' },
-          contact_name: { type: 'string', description: 'For send: saved contact name.' }
-        },
-        required: ['action']
-      }
-    },
-    {
-      name: 'save_warranty',
-      description: 'Propose saving a product warranty (the user confirms). Use when the user dictates warranty details; for a photo of a receipt the camera flow is used instead.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          product: { type: 'string' },
-          purchase_date: { type: 'string', description: 'YYYY-MM-DD' },
-          months: { type: 'integer', description: 'Warranty length in months (24 if unknown).' },
-          store: { type: 'string' }
-        },
-        required: ['product', 'purchase_date']
-      }
-    },
-    {
-      name: 'get_warranties',
-      description: "List the user's saved product warranties with expiry dates and days left.",
-      input_schema: { type: 'object', properties: {} }
-    },
-    {
-      name: 'save_important_date',
-      description: 'Save a birthday, name day, anniversary or other yearly date. Jarvis reminds a week before and on the day.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Person (nominative) or label, e.g. "Martina" or "Godišnjica braka".' },
-          type: { type: 'string', enum: ['rođendan', 'imendan', 'godišnjica', 'ostalo'] },
-          month: { type: 'integer' }, day: { type: 'integer' },
-          year: { type: 'integer', description: 'Optional birth/start year.' }
-        },
-        required: ['name', 'type', 'month', 'day']
-      }
-    },
-    {
-      name: 'get_important_dates',
-      description: 'List saved birthdays, name days and anniversaries with days until each.',
       input_schema: { type: 'object', properties: {} }
     },
     {
@@ -2656,9 +2577,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (localStorage.getItem('jarvis_last_briefing_date') === today) return;
     localStorage.setItem('jarvis_last_briefing_date', today);
     const lang = state.lang === 'auto' ? state.currentLang : state.lang;
-    let prompt = state.morningBriefingPrompt || 'Give me a short morning briefing.';
-    const notes = noticesText(getUpcomingNotices());
-    if (notes) prompt += `\n\nUključi i ove podsjetnike iz Jarvisove bilježnice:\n${notes}\nZa svaki rođendan ili imendan predloži jednu konkretnu ideju za poklon.`;
+    const prompt = state.morningBriefingPrompt || 'Give me a short morning briefing.';
     const delay = state.bootSequenceEnabled ? 2200 : 600; // wait out the boot overlay so the message isn't hidden behind it
     setTimeout(() => {
       handleUserMessage(prompt, lang, { displayText: isHr(lang) ? '☀️ Jutarnji brifing' : '☀️ Morning briefing' });
@@ -2957,9 +2876,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       contacts: state.contacts,
       expenses: state.expenses,
       ideas: loadIdeas(),
-      shopping: loadList('jarvis_shopping'),
-      warranties: loadList('jarvis_warranties'),
-      dates: loadList('jarvis_dates'),
       reminders: loadReminders(),
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -2983,10 +2899,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         if (Array.isArray(data.protocols)) { state.protocols = data.protocols; saveProtocols(state.protocols); }
         if (Array.isArray(data.contacts)) { state.contacts = data.contacts; saveContacts(state.contacts); }
         if (Array.isArray(data.ideas)) { saveIdeas(data.ideas); renderIdeasInSettings(); }
-        for (const [k, key] of [['shopping', 'jarvis_shopping'], ['warranties', 'jarvis_warranties'], ['dates', 'jarvis_dates']]) {
-          if (Array.isArray(data[k])) saveList(key, data[k]);
-        }
-        renderShoppingInSettings(); renderWarrantiesInSettings(); renderDatesInSettings();
         if (Array.isArray(data.expenses)) { state.expenses = data.expenses; saveExpenses(state.expenses); renderExpensesInSettings(); }
         if (Array.isArray(data.reminders)) {
           saveReminders(data.reminders);
@@ -3415,15 +3327,15 @@ Rules:
     return /(slikaj|uslikaj|fotografiraj|očitaj|ocitaj|skeniraj|pročitaj|procitaj|scan|read|photograph|take a (photo|picture) of)\s+(mi\s+)?(i\s+)?(the\s+)?(water\s+|electricity\s+|electric\s+)?(brojil|vodomjer|strujomjer|meter)/.test(t)
       || /\b(brojil\w*|vodomjer\w*|strujomjer\w*)\b[\s\S]*\b(slikaj|uslikaj|očitaj|ocitaj|skeniraj)\b/.test(t);
   }
-  async function callVisionWithFallback(base64Jpeg, promptText, systemPrompt, maxTokens, mime = 'image/jpeg') {
+  async function callVisionWithFallback(base64Jpeg, promptText, systemPrompt, maxTokens) {
     const available = ['anthropic', 'gemini'].filter(p => state.keys[p]);
     if (!available.length) throw new Error('Za čitanje slike treba Anthropic ili Gemini API ključ.');
     let lastErr;
     for (const p of available) {
       try {
         return p === 'anthropic'
-          ? await callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens, mime)
-          : await callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens, mime);
+          ? await callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens)
+          : await callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens);
       } catch (e) { lastErr = e; }
     }
     throw lastErr;
@@ -3701,519 +3613,6 @@ Rules:
     await localReply(t, 'Tapni Otvori imenik i odaberi kontakte.', lang, true);
   }
 
-  // ==================================================================
-  // HOUSEHOLD — shopping list, warranties, important dates, daily notices,
-  // and content shared from other apps ("Podijeli s Jarvisom").
-  // ==================================================================
-  const SHOP = 'jarvis_shopping', WAR = 'jarvis_warranties', DATES = 'jarvis_dates';
-  const pad2 = n => String(n).padStart(2, '0');
-  function loadList(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } }
-  function saveList(key, list) { try { localStorage.setItem(key, JSON.stringify(list)); } catch {} }
-  function newId(p) { return `${p}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`; }
-  function normText(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/\s+/g, ' ').trim(); }
-  function capitalizeWords(s) { return String(s || '').trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); }
-  function plural(n, one, few, many) { const d = n % 10, h = n % 100; return d === 1 && h !== 11 ? one : (d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many); }
-  const stavkeWord = n => plural(n, 'stavku', 'stavke', 'stavki');
-  const daniWord = n => plural(n, 'dan', 'dana', 'dana');
-  const godineWord = n => plural(n, 'godina', 'godine', 'godina');
-  // Same thing despite Croatian case endings ("jaja"/"jaje", "mlijeka"/"mlijeko")?
-  function sameItem(a, b) {
-    const x = normText(a), y = normText(b);
-    if (!x || !y) return false;
-    if (x === y || (' ' + x + ' ').includes(' ' + y + ' ') || (' ' + y + ' ').includes(' ' + x + ' ')) return true;
-    const len = Math.max(3, Math.min(x.length, y.length) - 1);
-    return x.length >= 3 && y.length >= 3 && x.slice(0, len) === y.slice(0, len);
-  }
-  function daysUntil(date) { const a = new Date(); a.setHours(12, 0, 0, 0); const b = new Date(date); b.setHours(12, 0, 0, 0); return Math.round((b - a) / 86400000); }
-  function fmtDateHr(d) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}.`; }
-  function isoToday() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
-  function openExternal(url) { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); }
-
-  // ---------- One pending "potvrdi / odustani" (clearing the list, saving a warranty) ----------
-  let pendingConfirm = null; // { onYes, onNo, until }
-  function setPendingConfirm(onYes, onNo) { pendingConfirm = { onYes, onNo, until: Date.now() + 5 * 60000 }; }
-  function genericHandleVoiceConfirm(text, lang) {
-    if (!pendingConfirm) return false;
-    if (Date.now() > pendingConfirm.until) { pendingConfirm = null; return false; }
-    const t = text.trim().toLowerCase().replace(/[.!?,]+$/, '');
-    const yes = /^(da|potvrdi|potvrđujem|potvrdjujem|spremi|može|moze|u redu|ok|okej|yes|confirm|save)(\s+(to|molim|sada|odmah|please))?$/.test(t);
-    const no = /^(ne|odustani|poništi|ponisti|nemoj|otkaži|otkazi|cancel|no)(\s+(hvala|to|molim|thanks))?$/.test(t);
-    if (!yes && !no) return false;
-    const p = pendingConfirm; pendingConfirm = null;
-    (yes ? p.onYes : p.onNo)(lang, text.trim());
-    return true;
-  }
-
-  // ---------- Shopping list ----------
-  let shoppingCard = null;
-  function splitItems(s) {
-    return String(s || '').split(/\s*[,;]\s*|\s+i\s+|\n+/)
-      .map(x => x.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/, '').replace(/[.!?]+$/, '').trim())
-      .filter(x => x && x.length < 80);
-  }
-  function addShoppingItems(texts) {
-    const list = loadList(SHOP); const added = [], dup = [];
-    for (const raw of texts) {
-      const ex = list.find(i => sameItem(i.text, raw));
-      if (ex) { if (ex.done) { ex.done = false; added.push(ex.text); } else dup.push(ex.text); continue; }
-      list.push({ id: newId('shop'), text: raw, done: false, addedAt: Date.now() }); added.push(raw);
-    }
-    saveList(SHOP, list); refreshShoppingViews();
-    return { added, dup };
-  }
-  function removeShoppingItems(texts) {
-    const removed = [];
-    const keep = loadList(SHOP).filter(i => { const hit = texts.some(q => sameItem(i.text, q)); if (hit) removed.push(i.text); return !hit; });
-    saveList(SHOP, keep); refreshShoppingViews();
-    return removed;
-  }
-  function markBought(texts) {
-    const list = loadList(SHOP); const hits = [];
-    list.forEach(i => { if (!i.done && texts.some(q => sameItem(i.text, q))) { i.done = true; hits.push(i.text); } });
-    saveList(SHOP, list); refreshShoppingViews();
-    return hits;
-  }
-  function toggleShopItem(id) { const list = loadList(SHOP); const i = list.find(x => x.id === id); if (i) i.done = !i.done; saveList(SHOP, list); refreshShoppingViews(); }
-  function shoppingListHtml() {
-    const list = loadList(SHOP);
-    if (!list.length) return '<div class="reminders-empty">Popis je prazan.</div>';
-    return list.map(i => `<div class="reminder-item shop-item" data-id="${i.id}" role="button" style="cursor:pointer;${i.done ? 'opacity:.5;' : ''}">
-        <div>${i.done ? '✓ <s>' + escapeHtml(i.text) + '</s>' : '☐ ' + escapeHtml(i.text)}</div></div>`).join('');
-  }
-  function wireShopItems(root) { root.querySelectorAll('.shop-item').forEach(el => el.addEventListener('click', () => toggleShopItem(el.dataset.id))); }
-  function renderShoppingInSettings() { const el = $('shoppingList'); if (!el) return; el.innerHTML = shoppingListHtml(); wireShopItems(el); }
-  function showShoppingCard() {
-    shoppingCard = utilCard(shoppingCard && shoppingCard.isConnected ? shoppingCard : null, 'POPIS ZA KUPOVINU', `<div class="reminders-list">${shoppingListHtml()}</div>`, [], '🛒');
-    wireShopItems(shoppingCard);
-  }
-  function refreshShoppingViews() { renderShoppingInSettings(); if (shoppingCard && shoppingCard.isConnected) showShoppingCard(); }
-  function shoppingSpoken() {
-    const open = loadList(SHOP).filter(i => !i.done);
-    return open.length ? `Na popisu imaš ${open.length} ${stavkeWord(open.length)}: ${open.map(i => i.text).join(', ')}.` : 'Popis za kupovinu je prazan.';
-  }
-  function prepareShoppingSend(name, channel) {
-    const c = findContactByName(name);
-    if (!c) return { error: `Nemam spremljen kontakt "${name}". Dodaj ga u Settings → Contacts.` };
-    const open = loadList(SHOP).filter(i => !i.done);
-    if (!open.length) return { error: 'Popis je prazan, nemam što poslati.' };
-    const text = 'Popis za kupovinu:\n' + open.map(i => '• ' + i.text).join('\n');
-    renderLinkCard({ url: buildMessageUrl(c.phone, text, channel === 'sms' ? 'sms' : 'whatsapp'), title: `${channel === 'sms' ? 'SMS' : 'WhatsApp'}: ${c.name}`, description: `Popis za kupovinu (${open.length})` });
-    return { contact: c, count: open.length };
-  }
-  function askClearShopping() {
-    const n = loadList(SHOP).length;
-    if (!n) return 'Popis je već prazan.';
-    setPendingConfirm(
-      async (l, t) => { saveList(SHOP, []); refreshShoppingViews(); await localReply(t || 'Potvrdi.', 'Popis za kupovinu je obrisan.', l); },
-      async (l, t) => { await localReply(t || 'Odustani.', 'U redu, popis ostaje.', l); });
-    return `Obrisati cijeli popis, ${n} ${stavkeWord(n)}? Reci potvrdi ili odustani.`;
-  }
-  async function shoppingTool(input) {
-    const items = (input.items || []).map(String).map(s => s.trim()).filter(Boolean);
-    switch (input.action) {
-      case 'add': { const r = addShoppingItems(items); showShoppingCard(); return `Added: ${r.added.join(', ') || 'nothing'}${r.dup.length ? '; already on the list: ' + r.dup.join(', ') : ''}.`; }
-      case 'remove': { const r = removeShoppingItems(items); showShoppingCard(); return r.length ? `Removed: ${r.join(', ')}.` : 'None of those items were on the list.'; }
-      case 'bought': { const r = markBought(items); showShoppingCard(); return r.length ? `Marked as bought: ${r.join(', ')}.` : 'None of those items were on the list.'; }
-      case 'list': showShoppingCard(); return shoppingSpoken();
-      case 'clear': return askClearShopping() + ' (Nothing deleted yet; the user must say "potvrdi".)';
-      case 'send': { const r = prepareShoppingSend(input.contact_name || ''); return r.error || `Message card with the list is ready for ${r.contact.name}; the user taps it to send.`; }
-    }
-    return 'Unknown action.';
-  }
-
-  // ---------- Warranties ----------
-  const WARRANTY_SYSTEM_PROMPT = `You read a purchase receipt, invoice or warranty card in order to record a product warranty. Respond with ONLY a JSON object, no markdown and no other text:
-{"product": "<main product, short, in the document's language>", "store": "<shop name or empty>", "purchase_date": "<YYYY-MM-DD or empty>", "warranty_months": <number or null>, "price": <number or null>, "currency": "<3-letter code or empty>", "confidence": "high" | "medium" | "low"}
-Rules: warranty_months only if a warranty / jamstvo period is printed (convert years to months), otherwise null. If there are several items, pick the most expensive durable product. Never invent data: leave unknown fields empty or null.`;
-  let pendingWarranty = null, warrantyCard = null;
-  function warrantyExpiry(w) {
-    const d = new Date(w.purchaseDate + 'T12:00:00'); const day = d.getDate();
-    d.setMonth(d.getMonth() + w.months); if (d.getDate() !== day) d.setDate(0);
-    return d;
-  }
-  function durationText(m) { return m % 12 === 0 ? `${m / 12} ${godineWord(m / 12)}` : `${m} mjeseci`; }
-  function normalizeWarranty(w) {
-    const iso = /^\d{4}-\d{2}-\d{2}$/.test(w.purchaseDate || '') ? w.purchaseDate : isoToday();
-    const months = Number(w.months) > 0 ? Math.round(Number(w.months)) : null;
-    return { product: String(w.product || 'Proizvod').trim() || 'Proizvod', store: String(w.store || '').trim(), purchaseDate: iso,
-      months: months || 24, assumed: !months, dateAssumed: iso !== w.purchaseDate,
-      price: Number(w.price) > 0 ? Number(w.price) : null, currency: String(w.currency || '').toUpperCase(), confidence: w.confidence || 'medium' };
-  }
-  function parseWarrantyResponse(raw) {
-    const m = String(raw || '').replace(/```json|```/gi, '').match(/\{[\s\S]*\}/);
-    let o = {}; try { o = m ? JSON.parse(m[0]) : {}; } catch { o = {}; }
-    return normalizeWarranty({ product: o.product, store: o.store, purchaseDate: o.purchase_date, months: o.warranty_months, price: o.price, currency: o.currency, confidence: o.confidence });
-  }
-  function renderWarrantyDraft() {
-    const w = pendingWarranty;
-    let body = utilRow('Proizvod', w.product) + (w.store ? utilRow('Trgovina', w.store) : '')
-      + utilRow('Kupljeno', fmtDateHr(new Date(w.purchaseDate + 'T12:00:00')) + (w.dateAssumed ? ' (datum nije pročitan — uzet današnji)' : ''))
-      + utilRow('Trajanje', durationText(w.months)) + utilRow('Vrijedi do', fmtDateHr(warrantyExpiry(w)), 'util-total');
-    if (w.assumed) body += `<div class="util-warning">Trajanje nije pisalo na računu, pa sam uzeo 2 godine (zakonsko jamstvo). Reci npr. "garancija 5 godina" ako je drukčije.</div>`;
-    warrantyCard = utilCard(warrantyCard && warrantyCard.isConnected ? warrantyCard : null, 'GARANCIJA', body, [
-      { label: '✓ Spremi', cls: 'util-save', onClick: () => commitWarranty(currentLang(), '') },
-      { label: '✕', cls: 'util-cancel', onClick: () => cancelWarranty(currentLang(), '') },
-    ], '🧾');
-  }
-  async function proposeWarranty(w, lang, userText, silent) {
-    pendingWarranty = w; warrantyCard = null;
-    renderWarrantyDraft();
-    setPendingConfirm(commitWarranty, cancelWarranty);
-    if (!silent) {
-      const msg = `${w.product}${w.store ? ', ' + w.store : ''}. Garancija vrijedi do ${fmtDateHr(warrantyExpiry(w))}.`
-        + (w.assumed ? ' Trajanje nije pisalo, pa sam uzeo dvije godine; reci na primjer garancija pet godina ako je drukčije.' : '')
-        + ' Reci potvrdi za spremanje.';
-      addMessage('assistant', msg);
-      state.history.push({ role: 'user', content: userText || 'Spremi garanciju.' });
-      state.history.push({ role: 'assistant', content: msg });
-      persistHistory();
-      await speak(msg, lang);
-    }
-    return w;
-  }
-  async function commitWarranty(lang, spokenText) {
-    if (!pendingWarranty) return;
-    const w = pendingWarranty; pendingWarranty = null; pendingConfirm = null;
-    const list = loadList(WAR);
-    list.push({ id: newId('war'), product: w.product, store: w.store, purchaseDate: w.purchaseDate, months: w.months, price: w.price, currency: w.currency, createdAt: Date.now() });
-    saveList(WAR, list); renderWarrantiesInSettings();
-    const msg = `Garancija za ${w.product} je spremljena, vrijedi do ${fmtDateHr(warrantyExpiry(w))}. Podsjetit ću te mjesec dana prije isteka.`;
-    utilFinalizeCard(warrantyCard, 'GARANCIJA', '✓ ' + msg);
-    await localReply(spokenText || 'Spremi garanciju.', msg, lang, !spokenText);
-  }
-  async function cancelWarranty(lang, spokenText) {
-    if (!pendingWarranty) return;
-    pendingWarranty = null; pendingConfirm = null;
-    utilFinalizeCard(warrantyCard, 'GARANCIJA', 'Odustano — garancija nije spremljena.');
-    await localReply(spokenText || 'Odustani.', 'U redu, garanciju nisam spremio.', lang, !spokenText);
-  }
-  const NUM_WORDS = { jedn: 1, jedan: 1, jedna: 1, dvije: 2, dva: 2, tri: 3, cetiri: 4, pet: 5, sest: 6, sedam: 7, osam: 8, devet: 9, deset: 10 };
-  function warrantyAdjustFromVoice(t, lang) {
-    const x = normText(t);
-    const m = /(\d+|jedn\w*|jedan|jedna|dvije|dva|tri|cetiri|pet|sest|sedam|osam|devet|deset)\s+(godin\w*|mjesec\w*)/.exec(x);
-    if (!m || !(/garanc|jamstv|traj/.test(x) || x.split(' ').length <= 3)) return false;
-    const n = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : NUM_WORDS[m[1]] || NUM_WORDS[m[1].slice(0, 4)] || 0;
-    if (!n) return false;
-    pendingWarranty.months = /godin/.test(m[2]) ? n * 12 : n;
-    pendingWarranty.assumed = false;
-    renderWarrantyDraft();
-    setPendingConfirm(commitWarranty, cancelWarranty);
-    localReply(t, `Trajanje je ${durationText(pendingWarranty.months)}, vrijedi do ${fmtDateHr(warrantyExpiry(pendingWarranty))}. Reci potvrdi za spremanje.`, lang);
-    return true;
-  }
-  function warrantyRows(list) {
-    return list.map(w => ({ w, exp: warrantyExpiry(w), days: daysUntil(warrantyExpiry(w)) })).sort((a, b) => a.exp - b.exp);
-  }
-  function warrantyStatus(x) { return x.days < 0 ? `istekla ${fmtDateHr(x.exp)}` : `vrijedi do ${fmtDateHr(x.exp)} (još ${x.days} ${daniWord(x.days)})`; }
-  function showWarrantiesCard() {
-    const rows = warrantyRows(loadList(WAR));
-    const body = rows.length ? rows.map(x => utilRow(x.w.product + (x.w.store ? ` (${x.w.store})` : ''), warrantyStatus(x), x.days >= 0 && x.days <= 30 ? 'util-total' : '')).join('')
-      : '<div class="reminders-empty">Nema spremljenih garancija. Reci "slikaj garanciju".</div>';
-    utilCard(null, 'GARANCIJE', body, [], '🧾');
-  }
-  function renderWarrantiesInSettings() {
-    const el = $('warrantiesList'); if (!el) return;
-    const rows = warrantyRows(loadList(WAR));
-    el.innerHTML = rows.length ? rows.map(x => `<div class="reminder-item"><div><div>🧾 ${escapeHtml(x.w.product)}${x.w.store ? ' · ' + escapeHtml(x.w.store) : ''}</div>
-        <div class="reminder-time">${warrantyStatus(x)}</div></div><button data-id="${x.w.id}" class="reminder-delete" type="button" aria-label="Obriši garanciju">×</button></div>`).join('')
-      : '<div class="reminders-empty">Nema spremljenih garancija.</div>';
-    el.querySelectorAll('.reminder-delete').forEach(b => b.addEventListener('click', async () => {
-      if (await requirePassword('Obrisati ovu garanciju?')) { saveList(WAR, loadList(WAR).filter(w => w.id !== b.dataset.id)); renderWarrantiesInSettings(); }
-    }));
-  }
-
-  // ---------- Important dates (birthdays, name days, anniversaries) ----------
-  const MONTHS_GEN = ['siječnja', 'veljače', 'ožujka', 'travnja', 'svibnja', 'lipnja', 'srpnja', 'kolovoza', 'rujna', 'listopada', 'studenoga', 'prosinca'];
-  const MONTH_STEMS = [['sijec', 1], ['velja', 2], ['ozuj', 3], ['trav', 4], ['svib', 5], ['lip', 6], ['srp', 7], ['kolov', 8], ['ruj', 9], ['listop', 10], ['stud', 11], ['pros', 12]];
-  function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
-  function parseDayMonth(s) {
-    const t = normText(s);
-    const ok = (d, m, y) => (m >= 1 && m <= 12 && d >= 1 && d <= daysInMonth(2000, m)) ? { day: d, month: m, year: y || null } : null;
-    let m = /(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?(?:\s*(\d{4}))?/.exec(t);
-    if (m) return ok(+m[1], +m[2], m[3] ? +m[3] : null);
-    m = /(\d{1,2})\s*\.?\s*([a-z]+)(?:\s*(\d{4}))?/.exec(t);
-    if (m) { const st = MONTH_STEMS.find(([p]) => m[2].startsWith(p)); if (st) return ok(+m[1], st[1], m[3] ? +m[3] : null); }
-    return null;
-  }
-  function saveImportantDate({ name, type, month, day, year }) {
-    month = Number(month); day = Number(day);
-    if (!(month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(2000, month))) return null;
-    const nm = capitalizeWords(String(name || '').replace(/^da\s+/i, ''));
-    const tp = ['rođendan', 'imendan', 'godišnjica', 'ostalo'].includes(type) ? type : 'ostalo';
-    if (!nm) return null;
-    const list = loadList(DATES);
-    let e = list.find(x => normText(x.name) === normText(nm) && x.type === tp);
-    if (e) Object.assign(e, { month, day, year: year || e.year || null });
-    else { e = { id: newId('date'), name: nm, type: tp, month, day, year: year || null }; list.push(e); }
-    saveList(DATES, list); renderDatesInSettings();
-    return e;
-  }
-  function nextOccurrence(e) {
-    const now = new Date(); now.setHours(12, 0, 0, 0);
-    const at = y => new Date(y, e.month - 1, Math.min(e.day, daysInMonth(y, e.month)), 12);
-    let d = at(now.getFullYear());
-    if (d < now) d = at(now.getFullYear() + 1);
-    return d;
-  }
-  function upcomingDates(maxDays) {
-    return loadList(DATES).map(e => { const d = nextOccurrence(e); return { entry: e, date: d, days: daysUntil(d), age: e.year && e.type !== 'ostalo' ? d.getFullYear() - e.year : null }; })
-      .filter(x => x.days <= maxDays).sort((a, b) => a.days - b.days);
-  }
-  function dateLabel(e) { return `${e.day}. ${MONTHS_GEN[e.month - 1]}`; }
-  function dateWhen(x) { return x.days === 0 ? 'danas' : x.days === 1 ? 'sutra' : `za ${x.days} ${daniWord(x.days)}`; }
-  async function voiceSaveDate(t, nameRaw, type, dateRaw, lang) {
-    const d = parseDayMonth(dateRaw);
-    if (!d) { await localReply(t, 'Nisam razumio datum. Reci na primjer: zapamti da Martina ima rođendan dvanaestog svibnja, ili 12. 5.', lang); return; }
-    const e = saveImportantDate({ name: nameRaw, type, month: d.month, day: d.day, year: d.year });
-    if (!e) { await localReply(t, 'Nisam razumio ime ili datum.', lang); return; }
-    await localReply(t, `Zapamtio sam: ${e.name}, ${e.type} ${dateLabel(e)}. Podsjetit ću te tjedan dana prije i na sam dan.`, lang);
-  }
-  function showDatesCard() {
-    const rows = upcomingDates(366);
-    const body = rows.length ? rows.map(x => utilRow(`${x.entry.name} — ${x.entry.type}`, `${dateLabel(x.entry)} · ${dateWhen(x)}${x.age ? ` · ${x.age}.` : ''}`, x.days <= 7 ? 'util-total' : '')).join('')
-      : '<div class="reminders-empty">Nema spremljenih datuma.</div>';
-    utilCard(null, 'VAŽNI DATUMI', body, [], '🎂');
-  }
-  function renderDatesInSettings() {
-    const el = $('datesList'); if (!el) return;
-    const rows = upcomingDates(366);
-    el.innerHTML = rows.length ? rows.map(x => `<div class="reminder-item"><div><div>🎂 ${escapeHtml(x.entry.name)} — ${x.entry.type}</div>
-        <div class="reminder-time">${dateLabel(x.entry)}${x.entry.year ? ' ' + x.entry.year + '.' : ''} · ${dateWhen(x)}</div></div>
-        <button data-id="${x.entry.id}" class="reminder-delete" type="button" aria-label="Obriši datum">×</button></div>`).join('')
-      : '<div class="reminders-empty">Nema spremljenih datuma.</div>';
-    el.querySelectorAll('.reminder-delete').forEach(b => b.addEventListener('click', async () => {
-      if (await requirePassword('Obrisati ovaj datum?')) { saveList(DATES, loadList(DATES).filter(e => e.id !== b.dataset.id)); renderDatesInSettings(); }
-    }));
-  }
-
-  // ---------- Daily notices (once per day, on first open) ----------
-  function getUpcomingNotices() {
-    const dates = upcomingDates(7);
-    const warranties = warrantyRows(loadList(WAR)).filter(x => x.days >= 0 && x.days <= 30);
-    return { dates, warranties };
-  }
-  function noticesText(n) {
-    const lines = n.dates.map(x => `${x.days === 0 ? 'Danas' : dateWhen(x).charAt(0).toUpperCase() + dateWhen(x).slice(1)}: ${x.entry.name} — ${x.entry.type}${x.age ? ` (${x.age}.)` : ''}, ${dateLabel(x.entry)}.`)
-      .concat(n.warranties.map(x => `Za ${x.days} ${daniWord(x.days)} istječe garancija: ${x.w.product} (${fmtDateHr(x.exp)}).`));
-    return lines.join('\n');
-  }
-  function runDailyNotices() {
-    const today = localDateStamp();
-    if (localStorage.getItem('jarvis_last_notice_date') === today) return;
-    localStorage.setItem('jarvis_last_notice_date', today);
-    const n = getUpcomingNotices();
-    if (!n.dates.length && !n.warranties.length) return;
-    const buttons = [];
-    n.dates.filter(x => x.days === 0 && (x.entry.type === 'rođendan' || x.entry.type === 'imendan')).forEach(x => {
-      const c = findContactByName(x.entry.name);
-      if (c) buttons.push({ label: `🎉 Čestitka: ${x.entry.name}`, cls: 'util-save', onClick: () => openExternal(buildMessageUrl(c.phone, `Sretan ${x.entry.type}, ${x.entry.name}! 🎉`, 'whatsapp')) });
-    });
-    const body = noticesText(n).split('\n').map(l => `<div class="util-row"><span class="util-v" style="text-align:left;">${escapeHtml(l)}</span></div>`).join('')
-      + (n.dates.length ? `<div class="util-row"><span class="util-l">Za ideju za poklon pitaj: "što da kupim ${escapeHtml(n.dates[0].entry.name)}?"</span></div>` : '');
-    utilCard(null, 'PODSJETNICI', body, buttons, '🔔');
-  }
-
-  // ---------- Local voice commands for the household features ----------
-  function routeHouseholdIntents(t, lang) {
-    const x = t.toLowerCase().replace(/[.!?]+$/, '').trim();
-    let m;
-    // Important dates
-    m = /^(zapamti|spremi|dodaj|upiši|upisi|zabilježi|zabiljezi)\s+(mi\s+)?(da\s+)?(.+?)\s+ima\s+(rođendan|rodjendan|rodendan|imendan)\s+(.+)$/.exec(x);
-    if (m) { voiceSaveDate(t, m[4], /imendan/.test(m[5]) ? 'imendan' : 'rođendan', m[6], lang); return true; }
-    if (/^(koji|koje)\s+(su\s+)?(sve\s+)?(rođendan\w*|rodjendan\w*|imendan\w*|važn\w* datum\w*|vazn\w* datum\w*)|^(pokaži|pokazi|pročitaj|procitaj|nabroji)\s+(mi\s+)?(sve\s+)?(rođendan\w*|rodjendan\w*|imendan\w*|važn\w* datum\w*|vazn\w* datum\w*)/.test(x)) {
-      showDatesCard();
-      const up = upcomingDates(366).slice(0, 3);
-      localReply(t, up.length ? 'Sljedeći su: ' + up.map(u => `${u.entry.name}, ${u.entry.type} ${dateWhen(u)}`).join('; ') + '.' : 'Nemaš spremljenih datuma.', lang);
-      return true;
-    }
-    // Warranties: photo only for short commands or explicit photo words; dictated details go to the AI model
-    if (/^(slikaj|uslikaj|skeniraj|fotografiraj|spremi|dodaj)\s+(mi\s+)?(novu\s+)?(garanciju|jamstvo|jamstveni list)/.test(x)
-        && (/^(slikaj|uslikaj|skeniraj|fotografiraj)/.test(x) || x.split(' ').length <= 3)) {
-      // Something was just shared (photo or PDF of a receipt)? Use it instead of the camera.
-      if (sharedFresh() && sharedItem.kind !== 'text') handleCameraRequest(t, lang, { mode: 'warranty', base64: sharedItem.base64, mime: sharedItem.mime });
-      else handleCameraRequest(t, lang, { mode: 'warranty' });
-      return true;
-    }
-    if (/^(koje|pokaži|pokazi|pročitaj|procitaj|nabroji)\s+(su\s+)?(mi\s+)?(sve\s+)?(garancije|jamstva)|^koje garancije imam/.test(x)) {
-      showWarrantiesCard();
-      const rows = warrantyRows(loadList(WAR)).filter(r => r.days >= 0);
-      localReply(t, rows.length ? `Imaš ${rows.length} ${plural(rows.length, 'važeću garanciju', 'važeće garancije', 'važećih garancija')}. Prva istječe ${rows[0].w.product}, ${fmtDateHr(rows[0].exp)}.` : 'Nemaš važećih garancija.', lang);
-      return true;
-    }
-    // Shopping list
-    m = /^(pošalji|posalji)\s+(mi\s+)?(popis|listu)(\s+za\s+kupovinu)?\s+(.+?)(\s+(sms\w*|porukom|na whatsapp|whatsapp\w*|preko whatsappa))?$/.exec(x);
-    if (m) {
-      const r = prepareShoppingSend(m[5], m[7] && /sms|porukom/.test(m[7]) ? 'sms' : 'whatsapp');
-      localReply(t, r.error || `Pripremio sam popis za ${r.contact.name}. Tapni karticu da ga pošalješ.`, lang);
-      return true;
-    }
-    if (/^(očisti|ocisti|isprazni|obriši|obrisi|izbriši|izbrisi)\s+(cijeli\s+|sav\s+)?(popis|listu)(\s+za\s+kupovinu)?$/.test(x)) { localReply(t, askClearShopping(), lang); return true; }
-    m = /^(makni|ukloni|obriši|obrisi|izbriši|izbrisi|briši|brisi|skini)\s+(.+?)\s+(s|sa|iz)\s+(popisa|liste)(\s+za\s+kupovinu)?$/.exec(x);
-    if (m) {
-      const r = removeShoppingItems(splitItems(m[2])); showShoppingCard();
-      localReply(t, r.length ? `Maknuo sam: ${r.join(', ')}.` : 'Toga nema na popisu.', lang);
-      return true;
-    }
-    m = /^(dodaj|stavi|upiši|upisi|zapiši|zapisi)\s+(.+?)\s+(na|u)\s+(popis|listu)(\s+za\s+kupovinu)?$/.exec(x)
-      || /^(na\s+popis|na\s+listu)\s+(dodaj|stavi)\s+(.+)$/.exec(x)
-      || /^(treba|trebamo|trebam)\s+(nam\s+|mi\s+)?(kupiti\s+|još\s+|jos\s+)(.+)$/.exec(x);
-    if (m) {
-      const what = (m[4] && /^(treba|trebamo|trebam)/.test(x)) ? m[4] : (/^na\s+/.test(x) ? m[3] : m[2]);
-      if (/^(to|sve|ovo|to sve|sve to|ovo sve)$/.test(what.trim()) && sharedFresh()) { sharedToShopping(lang); return true; }
-      const r = addShoppingItems(splitItems(what)); showShoppingCard();
-      localReply(t, (r.added.length ? `Dodao sam: ${r.added.join(', ')}.` : '') + (r.dup.length ? ` Već na popisu: ${r.dup.join(', ')}.` : ''), lang);
-      return true;
-    }
-    m = /^(kupio sam|kupila sam|kupili smo|kupljen\w*)\s*:?\s+(.+)$/.exec(x);
-    if (m) {
-      const hits = markBought(splitItems(m[2]));
-      if (!hits.length) return false; // not about the list — let the AI model answer
-      showShoppingCard();
-      const left = loadList(SHOP).filter(i => !i.done).length;
-      localReply(t, `Označio sam kao kupljeno: ${hits.join(', ')}.` + (left ? ` Još ${left} ${plural(left, 'stavka', 'stavke', 'stavki')}.` : ' Sve s popisa je kupljeno.'), lang);
-      return true;
-    }
-    if (/^(što|sto|šta|sta)\s+(imam|ima|imamo|je)\s+na\s+(popisu|listi)|^(pročitaj|procitaj|pokaži|pokazi|reci)\s+(mi\s+)?(popis|listu)(\s+za\s+kupovinu)?$/.test(x)) {
-      showShoppingCard(); localReply(t, shoppingSpoken(), lang); return true;
-    }
-    return false;
-  }
-
-  // ---------- "Podijeli s Jarvisom" — content shared from other apps ----------
-  // The installed app's service worker (sw.js) receives the share, keeps the
-  // content in a short-lived cache and opens Jarvis with ?shared=<id>.
-  let deferredInstallPrompt = null;
-  let sharedItem = null; // { kind: 'text'|'image'|'pdf', title, text, url, base64, mime, name, at }
-  function sharedFresh() { return !!sharedItem && Date.now() - sharedItem.at < 15 * 60000; }
-  function blobToBase64(blob) {
-    return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(new Error('Datoteku nije moguće pročitati.')); r.readAsDataURL(blob); });
-  }
-  function blobToJpegBase64(blob) {
-    return new Promise((res, rej) => {
-      const url = URL.createObjectURL(blob); const img = new Image();
-      img.onload = () => {
-        try {
-          const scale = Math.min(1, 1024 / Math.max(img.width || 1, img.height || 1));
-          const c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round((img.width || 1) * scale)); c.height = Math.max(1, Math.round((img.height || 1) * scale));
-          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-          URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8).split(',')[1]);
-        } catch (e) { rej(e); }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Sliku nije moguće otvoriti.')); };
-      img.src = url;
-    });
-  }
-  async function handleIncomingShare() {
-    const id = new URLSearchParams(location.search).get('shared');
-    if (!id) return;
-    try { history.replaceState(null, '', location.pathname); } catch {}
-    if (!('caches' in window)) return;
-    let meta = null; const files = [];
-    try {
-      const cache = await caches.open('jarvis-share');
-      const mr = await cache.match(`shared/${id}/meta`);
-      meta = mr ? await mr.json() : null;
-      for (let i = 0; meta && i < (meta.files || []).length; i++) {
-        const r = await cache.match(`shared/${id}/${i}`);
-        if (r) files.push({ blob: await r.blob(), type: meta.files[i].type || '', name: meta.files[i].name || '' });
-        await cache.delete(`shared/${id}/${i}`);
-      }
-      await cache.delete(`shared/${id}/meta`);
-    } catch (e) { addMessage('error', 'Podijeljeni sadržaj nije moguće pročitati: ' + e.message); return; }
-    if (!meta) { addMessage('error', 'Podijeljeni sadržaj više nije dostupan. Podijeli ga ponovno.'); return; }
-    await presentShared(meta, files);
-  }
-  async function presentShared(meta, files) {
-    const text = String(meta.text || '').trim(); let url = String(meta.url || '').trim();
-    if (!url) { const m = text.match(/https?:\/\/\S+/); if (m) url = m[0]; }
-    const title = String(meta.title || '').trim(); const f = files[0];
-    try {
-      if (f && /^image\//.test(f.type)) sharedItem = { kind: 'image', base64: await blobToJpegBase64(f.blob), mime: 'image/jpeg', name: f.name, title, text, url };
-      else if (f && f.type === 'application/pdf') {
-        if (f.blob.size > 15e6) throw new Error('PDF je prevelik (najviše 15 MB).');
-        sharedItem = { kind: 'pdf', base64: await blobToBase64(f.blob), mime: 'application/pdf', name: f.name, title, text, url };
-      } else if (f && /^text\//.test(f.type)) sharedItem = { kind: 'text', text: (await f.blob.text()).slice(0, 20000), title: title || f.name, url };
-      else if (f) throw new Error(`Ne znam otvoriti datoteku vrste "${f.type || 'nepoznato'}".`);
-      else sharedItem = { kind: 'text', text, title, url };
-    } catch (e) { addMessage('error', e.message); return; }
-    sharedItem.at = Date.now();
-    renderSharedCard();
-  }
-  function renderSharedCard() {
-    const s = sharedItem; const L = () => currentLang();
-    const preview = (s.text || '').replace(s.url || '\u0000', '').trim();
-    let body = '';
-    if (s.kind === 'image') body += `<img src="data:image/jpeg;base64,${s.base64}" alt="Podijeljena slika" style="width:100%;display:block;margin-bottom:6px;">`;
-    if (s.kind === 'pdf') body += utilRow('PDF', s.name || 'dokument');
-    if (s.title) body += utilRow('Naslov', s.title.slice(0, 120));
-    if (s.url) body += utilRow('Poveznica', s.url.length > 60 ? s.url.slice(0, 60) + '…' : s.url);
-    if (preview && s.kind === 'text') body += `<div class="util-row"><span class="util-l" style="white-space:pre-wrap;text-align:left;">${escapeHtml(preview.slice(0, 300))}${preview.length > 300 ? '…' : ''}</span></div>`;
-    const img = (label, text, mode) => ({ label, onClick: () => handleCameraRequest(text, L(), { mode, base64: s.base64, mime: s.mime }) });
-    const buttons = s.kind === 'image' ? [img('Opiši', 'Opiši podijeljenu sliku.', 'scene'), img('Pročitaj dokument', 'Pročitaj podijeljeni dokument.', 'document'), img('Spremi garanciju', 'Spremi garanciju s podijeljene slike.', 'warranty')]
-      : s.kind === 'pdf' ? [{ label: 'Sažmi', onClick: () => sharedSummarizePdf(L()) }, img('Pročitaj dokument', 'Pročitaj podijeljeni PDF.', 'document'), img('Spremi garanciju', 'Spremi garanciju iz PDF-a.', 'warranty')]
-      : [{ label: 'Sažmi', onClick: () => sharedAsk('Sažmi ukratko, u 3 do 5 rečenica.', '📥 Sažmi', L()) },
-         { label: 'Prevedi', onClick: () => sharedAsk('Prevedi na hrvatski. Ako je već na hrvatskom, prevedi na engleski.', '📥 Prevedi', L()) },
-         { label: 'Na popis', onClick: () => sharedToShopping(L()) },
-         { label: 'U kalendar', onClick: () => sharedAsk('Iz ovog sadržaja napravi događaj u mom kalendaru (alat create_calendar_event). Ako nema jasnog datuma i vremena, pitaj me.', '📥 U kalendar', L()) },
-         { label: 'Kao ideju', onClick: () => sharedToIdea(L()) }];
-    utilCard(null, 'PODIJELJENO', body, buttons, '📥');
-    addMessage('assistant', s.kind === 'image' ? 'Primio sam sliku. Što da napravim s njom?' : s.kind === 'pdf' ? 'Primio sam PDF. Što da napravim s njim?'
-      : (s.url && !preview ? 'Primio sam poveznicu. Što da napravim s njom?' : 'Primio sam tekst. Što da napravim s njim?'));
-  }
-  async function tavilyExtract(url) {
-    const res = await fetch('https://api.tavily.com/extract', { method: 'POST', headers: { Authorization: `Bearer ${state.tavilyKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ urls: [url] }) });
-    if (!res.ok) throw await httpError(res, 'Tavily');
-    const data = await res.json(); trackSimpleUsage('tavily');
-    return (data.results && data.results[0] && data.results[0].raw_content) || '';
-  }
-  async function sharedTextContent() {
-    const s = sharedItem; let content = [s.title, s.text].filter(Boolean).join('\n');
-    if (s.url && state.tavilyKey) { try { const page = await tavilyExtract(s.url); if (page) content = `${s.title ? s.title + '\n' : ''}${s.url}\n\n${page}`; } catch { /* fall back to the shared text */ } }
-    return content.slice(0, 20000);
-  }
-  async function sharedAsk(instruction, label, lang) {
-    if (!sharedFresh() || state.processing || state.speaking) return;
-    const content = await sharedTextContent();
-    const note = sharedItem.url && !state.tavilyKey ? '\n(Sadržaj stranice nije učitan jer nema Tavily ključa; radi samo s ovim tekstom i to kratko spomeni.)' : '';
-    handleUserMessage(`${instruction}${note}\n\n[Podijeljeni sadržaj]\n${content}`, lang, { displayText: label });
-  }
-  async function sharedSummarizePdf(lang) {
-    if (!sharedFresh() || state.processing || state.speaking) return;
-    addMessage('user', '📥 Sažmi PDF');
-    state.processing = true; setState('thinking'); updateMic();
-    try {
-      const summary = await callVisionWithFallback(sharedItem.base64, 'Sažmi ovaj dokument na hrvatskom u 3 do 5 rečenica.', 'You are J.A.R.V.I.S. Reply in plain spoken prose, no markdown, no lists.', 1500, 'application/pdf');
-      state.processing = false; updateMic();
-      addMessage('assistant', summary);
-      state.history.push({ role: 'user', content: 'Sažmi podijeljeni PDF.' }); state.history.push({ role: 'assistant', content: summary }); persistHistory();
-      await speak(summary, lang);
-    } catch (e) { state.processing = false; addMessage('error', e.message); setState('idle'); updateMic(); }
-  }
-  async function sharedToShopping(lang) {
-    const lines = splitItems((sharedItem.text || '').replace(sharedItem.url || '\u0000', ''));
-    if (!lines.length) { await localReply('📥 Na popis', 'U tekstu nisam našao stavke za popis.', lang); return; }
-    const r = addShoppingItems(lines); showShoppingCard();
-    await localReply('📥 Na popis za kupovinu', `Dodao sam ${r.added.length} ${stavkeWord(r.added.length)} na popis.` + (r.dup.length ? ` ${r.dup.length} je već bilo na popisu.` : ''), lang);
-  }
-  async function sharedToIdea(lang) {
-    const t = [sharedItem.title, sharedItem.text].filter(Boolean).join(' — ').slice(0, 300) || sharedItem.url || '';
-    const idea = addIdea(t);
-    await localReply('📥 Kao ideju', idea ? 'Zapisao sam to kao ideju.' : 'Nema teksta za zapisati.', lang);
-  }
-  function handleSharedVoice(t, lang) {
-    const s = sharedItem, x = normText(t);
-    if (s.kind === 'image' || s.kind === 'pdf') {
-      if (/garanc|jamstv/.test(x)) { handleCameraRequest(t, lang, { mode: 'warranty', base64: s.base64, mime: s.mime }); return true; }
-      if (s.kind === 'pdf' && /sazm|sazet/.test(x)) { sharedSummarizePdf(lang); return true; }
-      if (/procitaj|dokument|racun|podatk/.test(x)) { handleCameraRequest(t, lang, { mode: 'document', base64: s.base64, mime: s.mime }); return true; }
-      if (s.kind === 'image' && /opis|sto je|sta je|na slici|vidis/.test(x)) { handleCameraRequest(t, lang, { mode: 'scene', base64: s.base64 }); return true; }
-      return false;
-    }
-    if (/(zapisi|spremi).*(ideju)/.test(x)) { sharedToIdea(lang); return true; }
-    return false;
-  }
-
   // ---------- Settings by voice (only safe, predefined options) ----------
   const THEMES = { plava: 'Plava', zlatna: 'Zlatna', crvena: 'Crvena (Mark III)', zelena: 'Zelena' };
   const ELEVEN_VOICES = { george: ['JBFqnCBsd6RMkjVDRZzb', 'George'], daniel: ['onwK4e9ZLuTAKqWW03F9', 'Daniel'], callum: ['N2lVS1w4EtoT3dr4eOWO', 'Callum'], jessica: ['cgSgspJ2msm6clMCkdW9', 'Jessica'], adam: ['pNInz6obpgDQGcFmaJgB', 'Adam'] };
@@ -4433,8 +3832,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const idea = matchIdeaIntent(t);
     if (idea) { idea.text ? voiceSaveIdea(t, idea.text, lang) : voiceAskForIdea(t, lang); return; }
     if (isReadIdeasIntent(t)) { voiceReadIdeas(t, lang); return; }
-    if (genericHandleVoiceConfirm(t, lang)) return;
-    if (pendingWarranty && warrantyAdjustFromVoice(t, lang)) return;
     if (contactHandleVoiceConfirm(t, lang)) return;
     if (utilHandleVoiceConfirm(t, lang)) return;
     if (isImportContactsIntent(t)) { voiceImportContacts(t, lang); return; }
@@ -4444,7 +3841,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (newContact && newContact.phone) { voiceSaveContact(t, newContact, lang); return; }
     const settingIntent = matchSettingIntent(t);
     if (settingIntent) { voiceApplySetting(t, settingIntent, lang); return; }
-    if (routeHouseholdIntents(t, lang)) return;
     const panel = rezijePanelIntent(t);
     if (panel) {
       if (panel.action === 'close') { closeRezijePanel(); localReply(t, 'Zatvaram režije.', lang); }
@@ -4458,11 +3854,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (call) { placeCall(t, call.phone, call.label, lang, null, { immediate: true }); return; }
     if (isDocumentIntent(t)) { handleCameraRequest(t, lang, { mode: 'document' }); return; }
     if (isCameraIntent(t)) { handleCameraRequest(t, lang); return; }
-    if (sharedFresh() && handleSharedVoice(t, lang)) return;
-    if (sharedFresh() && sharedItem.kind === 'text') {
-      sharedTextContent().then(content => handleUserMessage(`${t}\n\n[Podijeljeni sadržaj]\n${content}`, lang, { displayText: t }));
-      return;
-    }
     handleUserMessage(t, lang);
   }
 
@@ -4937,29 +4328,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         }
         case 'delete_last_meter_reading':
           return await utilDeleteLast();
-        case 'shopping_list':
-          return await shoppingTool(toolUse.input);
-        case 'save_warranty': {
-          const w = { product: toolUse.input.product, store: toolUse.input.store || '', purchaseDate: toolUse.input.purchase_date, months: toolUse.input.months || null, confidence: 'high' };
-          const pw = await proposeWarranty(normalizeWarranty(w), null, null, true);
-          return `Proposed warranty: ${pw.product}, valid until ${fmtDateHr(warrantyExpiry(pw))}${pw.assumed ? ' (assumed 24 months)' : ''}. NOT saved yet — ask the user to say "potvrdi".`;
-        }
-        case 'get_warranties': {
-          const list = loadList('jarvis_warranties');
-          showWarrantiesCard();
-          if (!list.length) return 'No warranties saved.';
-          return list.map(w => `${w.product}${w.store ? ' (' + w.store + ')' : ''}: bought ${fmtDateHr(new Date(w.purchaseDate + 'T12:00:00'))}, valid until ${fmtDateHr(warrantyExpiry(w))}, ${daysUntil(warrantyExpiry(w))} days left`).join('; ');
-        }
-        case 'save_important_date': {
-          const e = saveImportantDate({ name: toolUse.input.name, type: toolUse.input.type, month: toolUse.input.month, day: toolUse.input.day, year: toolUse.input.year || null });
-          return e ? `Saved: ${e.name}, ${e.type}, ${e.day}. ${MONTHS_GEN[e.month - 1]}.` : 'Invalid date, nothing saved.';
-        }
-        case 'get_important_dates': {
-          const list = upcomingDates(366);
-          showDatesCard();
-          if (!list.length) return 'No important dates saved.';
-          return list.map(x => `${x.entry.name} — ${x.entry.type} ${x.entry.day}. ${MONTHS_GEN[x.entry.month - 1]} (in ${x.days} days${x.age ? ', turns ' + x.age : ''})`).join('; ');
-        }
         case 'change_setting': {
           try {
             const r = applySetting(toolUse.input.setting, toolUse.input.value);
@@ -5337,7 +4705,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     });
   }
 
-  async function describeImage(base64Jpeg, userText, lang, mime = 'image/jpeg') {
+  async function describeImage(base64Jpeg, userText, lang) {
     const order = ['anthropic', 'gemini'];
     const available = order.filter(p => state.keys[p]);
     if (!available.length) {
@@ -5350,8 +4718,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     let lastErr;
     for (const providerName of available) {
       try {
-        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400, mime);
-        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400, mime);
+        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400);
+        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, VISION_SYSTEM_PROMPT, 400);
       } catch (err) {
         lastErr = err;
         console.warn(`${providerName} vision failed: ${err.message}`);
@@ -5361,7 +4729,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     throw lastErr || new Error('Vision request failed.');
   }
 
-  async function describeDocument(base64Jpeg, userText, lang, mime = 'image/jpeg') {
+  async function describeDocument(base64Jpeg, userText, lang) {
     const order = ['anthropic', 'gemini'];
     const available = order.filter(p => state.keys[p]);
     if (!available.length) {
@@ -5374,8 +4742,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     let lastErr;
     for (const providerName of available) {
       try {
-        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500, mime);
-        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500, mime);
+        if (providerName === 'anthropic') return await callVisionAnthropic(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500);
+        if (providerName === 'gemini') return await callVisionGemini(base64Jpeg, promptText, DOCUMENT_SYSTEM_PROMPT, 500);
       } catch (err) {
         lastErr = err;
         console.warn(`${providerName} document vision failed: ${err.message}`);
@@ -5435,7 +4803,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     return /ra[čc]un|priznanic|dokument|skeniraj\s+(ra[čc]un|dokument)|receipt|invoice|scan\s+(this\s+)?document|read\s+(this\s+)?document|extract\s+(data|text)|posjetnic/.test(t);
   }
 
-  async function callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens, mime = 'image/jpeg') {
+  async function callVisionAnthropic(base64Jpeg, promptText, systemPrompt, maxTokens) {
     const model = state.models.anthropic;
     const body = {
       model,
@@ -5444,9 +4812,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       messages: [{
         role: 'user',
         content: [
-          mime === 'application/pdf'
-            ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Jpeg } }
-            : { type: 'image', source: { type: 'base64', media_type: mime, data: base64Jpeg } },
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Jpeg } },
           { type: 'text', text: promptText },
         ],
       }],
@@ -5456,7 +4822,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
   }
 
-  async function callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens, mime = 'image/jpeg') {
+  async function callVisionGemini(base64Jpeg, promptText, systemPrompt, maxTokens) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.models.gemini)}:generateContent`;
     const res = await fetch(url, {
       method: 'POST',
@@ -5465,7 +4831,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         contents: [{
           role: 'user',
           parts: [
-            { inlineData: { mimeType: mime, data: base64Jpeg } },
+            { inlineData: { mimeType: 'image/jpeg', data: base64Jpeg } },
             { text: promptText },
           ],
         }],
@@ -5482,13 +4848,12 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
 
   async function handleCameraRequest(spokenText, lang, opts = {}) {
     if (state.recognizing || state.processing || state.speaking || state.cameraActive) return;
-    const mode = ['document', 'warranty'].includes(opts.mode) ? opts.mode : 'scene';
-    const mime = opts.mime || 'image/jpeg';
+    const mode = opts.mode === 'document' ? 'document' : 'scene';
 
     const visionAvailable = state.keys.anthropic || state.keys.gemini;
     const label = (spokenText && spokenText.trim())
       ? spokenText.trim()
-      : (mode === 'warranty' ? '🧾 Garancija' : mode === 'document'
+      : (mode === 'document'
           ? (isHr(lang) ? '📄 Skeniram dokument' : '📄 Scanning document')
           : (isHr(lang) ? '📷 Aktiviram kameru' : '📷 Activating camera'));
     addMessage('user', label);
@@ -5499,32 +4864,27 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       return;
     }
 
-    let base64 = opts.base64 || null; // already have the image (e.g. shared from another app)
-    if (!base64) {
-      stopWakeWordListening();
-      state.cameraActive = true; setState('camera'); updateMic();
-      try {
-        base64 = await captureFromCamera();
-      } catch (err) {
-        state.cameraActive = false;
-        addMessage('error', `Camera: ${err.message}`);
-        setState('error'); setTimeout(() => setState('idle'), 1500);
-        updateMic();
-        resumeWakeWordIfEnabled();
-        return;
-      }
+    stopWakeWordListening();
+    state.cameraActive = true; setState('camera'); updateMic();
+    let base64;
+    try {
+      base64 = await captureFromCamera();
+    } catch (err) {
       state.cameraActive = false;
-      if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; } // user cancelled
+      addMessage('error', `Camera: ${err.message}`);
+      setState('error'); setTimeout(() => setState('idle'), 1500);
+      updateMic();
+      resumeWakeWordIfEnabled();
+      return;
     }
+    state.cameraActive = false;
+
+    if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; } // user cancelled
 
     state.processing = true; setState('thinking'); updateMic();
     try {
-      if (mode === 'warranty') {
-        const raw = await callVisionWithFallback(base64, 'Pročitaj podatke potrebne za garanciju.', WARRANTY_SYSTEM_PROMPT, 600, mime);
-        state.processing = false; setState('idle'); updateMic();
-        await proposeWarranty(parseWarrantyResponse(raw), lang, spokenText || 'Spremi garanciju.');
-      } else if (mode === 'document') {
-        const raw = await describeDocument(base64, spokenText, lang, mime);
+      if (mode === 'document') {
+        const raw = await describeDocument(base64, spokenText, lang);
         const { spoken, fields, receipt } = parseDocumentResponse(raw);
         renderDocumentCard(fields);
         if (receipt) addExpense(receipt.amount, receipt.currency, receipt.category, spoken);
@@ -5535,7 +4895,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         persistHistory();
         await speak(spoken, lang);
       } else {
-        const description = await describeImage(base64, spokenText, lang, mime);
+        const description = await describeImage(base64, spokenText, lang);
         state.processing = false;
         if (description) {
           addMessage('assistant', description);
@@ -5775,8 +5135,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     renderExpensesInSettings();
     renderUsageStats();
     renderIdeasInSettings();
-    renderShoppingInSettings(); renderWarrantiesInSettings(); renderDatesInSettings();
-    $('installAppBtn').style.display = deferredInstallPrompt ? '' : 'none';
     $('versionLabel').textContent = `Verzija ${JARVIS_VERSION}`;
     $('themeSelect').value = state.theme;
     $('ideasStatus').textContent = '';
@@ -5918,7 +5276,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
       'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme',
-      'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_last_notice_date',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
@@ -6037,21 +5394,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     addContact(name, phone);
     $('contactNameInput').value = '';
     $('contactPhoneInput').value = '';
-  });
-  $('shoppingClearDoneBtn').addEventListener('click', async () => {
-    if (!loadList('jarvis_shopping').some(i => i.done)) return;
-    if (await requirePassword('Ukloniti sve kupljene stavke s popisa?')) { saveList('jarvis_shopping', loadList('jarvis_shopping').filter(i => !i.done)); refreshShoppingViews(); }
-  });
-  $('shoppingClearAllBtn').addEventListener('click', async () => {
-    if (!loadList('jarvis_shopping').length) return;
-    if (await requirePassword('Obrisati cijeli popis za kupovinu?')) { saveList('jarvis_shopping', []); refreshShoppingViews(); }
-  });
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; const b = $('installAppBtn'); if (b) b.style.display = ''; });
-  $('installAppBtn').addEventListener('click', async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    try { await deferredInstallPrompt.userChoice; } catch {}
-    deferredInstallPrompt = null; $('installAppBtn').style.display = 'none';
   });
   $('copyIdeasBtn').addEventListener('click', async () => {
     const st = $('ideasStatus');
@@ -6196,10 +5538,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
 
   // Fires once per calendar day, on first open
   maybeRunMorningBriefing();
-  runDailyNotices();
-  // Installed app (PWA): the service worker only receives content shared from other apps.
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
-  handleIncomingShare();
 })();
 </script>
 </body>
