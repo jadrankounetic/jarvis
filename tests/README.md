@@ -19,7 +19,8 @@ npm test
 | `rezije-voice.test.js` | Režije glasom: upis, potvrda, slikanje brojila, zaštite, cijene, brisanje |
 | `rezije-panel.test.js` | Ploča Režije: kartice, unos, grafovi, cijene, glas i kamera iz ploče |
 | `providers.test.js` | Uključivanje/isključivanje modela (ključevi ostaju), OpenAI kroz Responses API (alati, slike, sigurnosne mreže) |
-| `models.test.js` | Claude Opus 5.5 pravila, zamjena zastarjelih modela, Haiku, Qwen, Gemini |
+| `models.test.js` | Claude Opus 5.5 pravila, zamjena zastarjelih modela, Haiku, Gemini, uklonjen Groq |
+| `whatsapp.test.js` | WhatsApp/SMS: međunarodni broj, izravno otvaranje na Androidu, automatsko otvaranje |
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
 | `ideas.test.js` | Bilježnica ideja, "Jarvis," ispred naredbi, broj verzije |

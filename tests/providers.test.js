@@ -39,7 +39,7 @@ const callsSince = n => calls.slice(n).map(c => c.p);
   await sleep(300);
   console.log('--- 1. Uključivanje / isključivanje u postavkama ---');
   click($('settingsBtn')); await sleep(40);
-  pass(d.querySelectorAll('.provider-enabled').length === 5 && [...d.querySelectorAll('.provider-enabled')].every(cb => cb.checked), 'Svih 5 providera ima prekidač, zadano uključen');
+  pass(d.querySelectorAll('.provider-enabled').length === 4 && [...d.querySelectorAll('.provider-enabled')].every(cb => cb.checked), 'Sva 4 providera imaju prekidač, zadano uključen (Groq uklonjen)');
   pass(!!d.querySelector('.provider-tab[data-provider="openai"]') && $('openaiModel').value === 'gpt-6-luna', 'Novi tab OpenAI, zadani model GPT-6 Luna');
   d.querySelector('.provider-enabled[data-provider="gemini"]').checked = false;
   d.querySelector('.provider-enabled[data-provider="gemini"]').dispatchEvent(new w.Event('change'));
@@ -49,7 +49,7 @@ const callsSince = n => calls.slice(n).map(c => c.p);
   let n = calls.length;
   await say('kakvo je vrijeme danas vani'); // default route would be Gemini
   console.log('    (odabran redoslijed: ' + callsSince(n).join(' → ') + ')');
-  pass(!callsSince(n).includes('gemini') && callsSince(n)[0] === 'openai', 'Isključeni Gemini se preskače; kratko pitanje ide sljedećem po pravilu (Groq → Gemini → OpenAI)');
+  pass(!callsSince(n).includes('gemini') && callsSince(n)[0] === 'openai', 'Isključeni Gemini se preskače; kratko pitanje ide sljedećem po pravilu (Gemini → OpenAI)');
 
   console.log('--- 2. Glasom ---');
   n = calls.length;
@@ -113,6 +113,6 @@ const callsSince = n => calls.slice(n).map(c => c.p);
   pass(w.localStorage.getItem('jarvis_forced_provider') === 'openai' && enabled().openai === true && w.localStorage.getItem('jarvis_auto_routing') === 'false', '"koristi samo ChatGPT" → OpenAI uključen i forsiran');
   pass(['A-KEY', 'G-KEY', 'O-KEY'].every((k, i) => w.localStorage.getItem(['jarvis_anthropic_key', 'jarvis_gemini_key', 'jarvis_openai_key'][i]) === k), 'Nijedan ključ nije izgubljen');
   click($('settingsBtn')); await sleep(30);
-  pass($('versionLabel').textContent === 'Verzija 8.8', 'Verzija 8.8');
+  pass($('versionLabel').textContent === 'Verzija 8.9', 'Verzija 8.9');
   process.exit(0);
 })().catch(e => { console.error('TEST ERROR', e); process.exit(1); });

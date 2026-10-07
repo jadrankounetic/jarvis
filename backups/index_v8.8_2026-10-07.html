@@ -804,16 +804,18 @@
         <option value="anthropic">Anthropic Claude</option>
         <option value="gemini">Google Gemini</option>
         <option value="openai">OpenAI (ChatGPT modeli)</option>
+        <option value="groq">Groq (Qwen/Llama)</option>
         <option value="openrouter">OpenRouter</option>
       </select>
     </div>
 
     <div class="info-note">
       <strong>Auto-routing logika:</strong><br>
-      • Kratki upiti → Gemini, zatim OpenAI<br>
-      • Programiranje i složeni / dugi upiti → Claude, zatim OpenAI<br>
+      • Kratki upiti → Groq (najbrži)<br>
+      • Programiranje → Groq Qwen Coder<br>
+      • Kompleksni / dugi → Anthropic Claude<br>
       • Ostalo → Gemini (besplatno)<br>
-      Ako je provider isključen ili padne, Jarvis prelazi na sljedeći.
+      Ako provider padne, automatski se prebacuje na sljedeći.
     </div>
 
     <h3>Providers</h3>
@@ -822,6 +824,7 @@
       <button class="provider-tab active" data-provider="anthropic">Claude</button>
       <button class="provider-tab" data-provider="gemini">Gemini</button>
       <button class="provider-tab" data-provider="openai">OpenAI</button>
+      <button class="provider-tab" data-provider="groq">Groq</button>
       <button class="provider-tab" data-provider="openrouter">OpenRouter</button>
     </div>
 
@@ -899,6 +902,30 @@
           <option value="gpt-5.6-terra">GPT-5.6 Terra — prethodna generacija</option>
           <option value="chat-latest">ChatGPT (chat-latest) — isti model kao u ChatGPT-u; alati možda neće raditi</option>
         </select>
+      </div>
+    </div>
+
+    <!-- GROQ -->
+    <div class="provider-panel" data-panel="groq">
+      <div class="toggle-row">
+        <div><div class="toggle-label">Uključen</div><div class="toggle-desc">Isključen model se ne koristi, ali ključ i postavke ostaju spremljeni.</div></div>
+        <label class="toggle"><input type="checkbox" class="provider-enabled" data-provider="groq" checked><span class="toggle-slider"></span></label>
+      </div>
+      <div class="field">
+        <label>Groq API Key</label>
+        <input type="password" id="groqKey" placeholder="gsk_...">
+        <div class="field-hint">Free — get at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> (bez kartice)</div>
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <select id="groqModel">
+          <option value="openai/gpt-oss-120b">GPT-OSS 120B — pouzdan, dobar za alate (preporuka)</option>
+          <option value="openai/gpt-oss-20b">GPT-OSS 20B — najbrži</option>
+          <option value="qwen/qwen3.8-27b">Qwen 3.8 27B — najnoviji Qwen</option>
+          <option value="qwen/qwen3.6-27b">Qwen 3.6 27B — prethodni Qwen</option>
+          <option value="minimaxai/minimax-m2.7">MiniMax M2.7 — novi, jak u zadacima s više koraka</option>
+        </select>
+        <div class="field-hint">Svi podržavaju Jarvisove alate (mape, kalendar, režije...). Groq Compound je uklonjen jer ih ne podržava.</div>
       </div>
     </div>
 
@@ -1026,11 +1053,6 @@
       <button class="btn btn-secondary" type="button" id="importContactsBtn">📇 Uvezi iz imenika</button>
     </div>
     <div class="field-hint" id="contactsStatus" style="margin-top:6px;"></div>
-    <div class="field">
-      <label>Pozivni broj države (za WhatsApp)</label>
-      <input type="text" inputmode="numeric" id="waCountryInput" placeholder="385">
-      <div class="field-hint">WhatsApp traži broj s pozivnim brojem države. Brojevi koji počinju s 0 (npr. 091…) dobivaju ovaj pozivni broj (385 = Hrvatska, 43 = Austrija).</div>
-    </div>
     <div class="info-note">
       Kontakt dodaješ i glasom ("spremi kontakt Martina 091 234 5678") ili iz imenika telefona (odabereš jednog ili više). Koristi se za "nazovi [ime]" i "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
     </div>
@@ -1046,7 +1068,7 @@
       </select>
     </div>
     <div class="info-note">
-      Glasom možeš mijenjati: temu ("promijeni temu u crvenu"), ton ("budi sarkastičan"), Claude model ("koristi Opus"), brzinu razmišljanja ("razmišljaj temeljito"), providera ("koristi samo Gemini", "isključi Gemini", "uključi ChatGPT"), auto-routing, wake word, kontinuirani razgovor, animaciju paljenja, jutarnji brifing i glas ("promijeni glas na Daniel"). API ključevi, brisanja i veze s bazama mijenjaju se samo ovdje.
+      Glasom možeš mijenjati: temu ("promijeni temu u crvenu"), ton ("budi sarkastičan"), Claude model ("koristi Opus"), brzinu razmišljanja ("razmišljaj temeljito"), providera ("koristi samo Gemini", "isključi Groq", "uključi ChatGPT"), auto-routing, wake word, kontinuirani razgovor, animaciju paljenja, jutarnji brifing i glas ("promijeni glas na Daniel"). API ključevi, brisanja i veze s bazama mijenjaju se samo ovdje.
     </div>
 
     <h3>Personality</h3>
@@ -1158,7 +1180,7 @@
       <button class="btn btn-small-danger" type="button" id="resetUsageBtn">Reset Usage Stats</button>
     </div>
     <div class="info-note">
-      Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio...).
+      Brojevi dolaze direktno iz odgovora API-ja (točno), ali cijene ovise o trenutnom cjeniku svakog providera — za točan iznos u eurima/dolarima provjeri billing dashboard providera (Anthropic Console, Google AI Studio, Groq Console...).
     </div>
 
     <h3>Popis za kupovinu</h3>
@@ -1290,7 +1312,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '8.9';
+  const JARVIS_VERSION = '8.8';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1626,7 +1648,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         type: 'object',
         properties: {
           setting: { type: 'string', enum: ['theme', 'tone', 'claude_model', 'thinking', 'provider', 'provider_enabled', 'auto_routing', 'wake_word', 'continuous', 'boot_animation', 'morning_briefing', 'voice'],
-            description: 'theme: plava|zlatna|crvena|zelena. tone: profesionalan|balansiran|sarkastičan. claude_model: opus|sonnet|haiku|fable. thinking: brzo|uravnoteženo|temeljito. provider (use only this one): claude|gemini|openai|openrouter. provider_enabled: "<provider> on" or "<provider> off" — switches a provider on/off without deleting its key. auto_routing, wake_word, continuous, boot_animation, morning_briefing: on|off. voice: george|daniel|callum|jessica|adam.' },
+            description: 'theme: plava|zlatna|crvena|zelena. tone: profesionalan|balansiran|sarkastičan. claude_model: opus|sonnet|haiku|fable. thinking: brzo|uravnoteženo|temeljito. provider (use only this one): claude|gemini|openai|groq|openrouter. provider_enabled: "<provider> on" or "<provider> off" — switches a provider on/off without deleting its key. auto_routing, wake_word, continuous, boot_animation, morning_briefing: on|off. voice: george|daniel|callum|jessica|adam.' },
           value: { type: 'string', description: 'New value, one of the options listed for the setting.' }
         },
         required: ['setting', 'value']
@@ -1878,7 +1900,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     };
   }
 
-  // ---------------- OPENROUTER (OpenAI-compatible chat completions) ----------------
+  // ---------------- GROQ / OPENROUTER (OpenAI-compatible) ----------------
   function makeOpenAIAdapter({ name, label, endpoint, extraHeaders }) {
     return {
       name, label,
@@ -1897,6 +1919,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           })),
           max_tokens: 4096, // reasoning models count their thinking here too
         };
+        if (/^qwen\//.test(model)) body.reasoning_format = 'hidden'; // keep Qwen's thinking out of the spoken reply
         const headers = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
@@ -1919,6 +1942,12 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       }
     };
   }
+
+  const groqAdapter = makeOpenAIAdapter({
+    name: 'groq',
+    label: 'GROQ',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+  });
 
   // OpenAI uses the Responses API: OpenAI requires it for tool calling on the
   // newest models (GPT-6.1 Sol, GPT-6 Astra). Reasoning items are not sent back
@@ -2107,6 +2136,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     openai: openaiAdapter,
     anthropic: anthropicAdapter,
     gemini: geminiAdapter,
+    groq: groqAdapter,
     openrouter: openrouterAdapter,
   };
 
@@ -2118,6 +2148,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     keys: {
       anthropic: localStorage.getItem('jarvis_anthropic_key') || '',
       gemini: localStorage.getItem('jarvis_gemini_key') || '',
+      groq: localStorage.getItem('jarvis_groq_key') || '',
       openrouter: localStorage.getItem('jarvis_openrouter_key') || '',
       openai: localStorage.getItem('jarvis_openai_key') || '',
     },
@@ -2125,6 +2156,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     models: {
       anthropic: localStorage.getItem('jarvis_anthropic_model') || 'claude-opus-5-5',
       gemini: localStorage.getItem('jarvis_gemini_model') || 'gemini-3-flash-preview',
+      groq: localStorage.getItem('jarvis_groq_model') || 'openai/gpt-oss-120b',
       openrouter: localStorage.getItem('jarvis_openrouter_model') || 'meta-llama/llama-3.3-70b-instruct:free',
       openai: localStorage.getItem('jarvis_openai_model') || 'gpt-6-luna',
       openrouterCustom: localStorage.getItem('jarvis_openrouter_custom') || '',
@@ -2174,7 +2206,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     rezijeTitle: localStorage.getItem('jarvis_rezije_title') || '',
     anthropicEffort: localStorage.getItem('jarvis_anthropic_effort') || 'low',
     theme: localStorage.getItem('jarvis_theme') || 'plava',
-    waCountryCode: localStorage.getItem('jarvis_wa_country') || '385',
     // Providers can be switched off without deleting their keys ({ gemini: false } = off)
     providerEnabled: (() => { try { return JSON.parse(localStorage.getItem('jarvis_provider_enabled') || '{}') || {}; } catch { return {}; } })(),
     // Runtime
@@ -2199,20 +2230,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     const MODEL_MIGRATIONS = {
       'claude-opus-4-7': 'claude-opus-5-5',
       'claude-sonnet-4-6': 'claude-sonnet-5',
+      'groq/compound': 'openai/gpt-oss-120b',
+      'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
+      'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+      'qwen-2.5-coder-32b': 'openai/gpt-oss-120b',
       'gemini-3.1-pro-preview': 'gemini-3-flash-preview',
       'gemini-2.5-flash': 'gemini-3-flash-preview',
     };
-    for (const p of ['anthropic', 'gemini']) {
+    for (const p of ['anthropic', 'gemini', 'groq']) {
       const next = MODEL_MIGRATIONS[state.models[p]];
       if (next) { state.models[p] = next; localStorage.setItem(`jarvis_${p}_model`, next); }
     }
-  }
-
-  // v8.9: Groq was removed from Jarvis — clean up what it left in this browser.
-  {
-    ['jarvis_groq_key', 'jarvis_groq_model'].forEach(k => localStorage.removeItem(k));
-    if (state.forcedProvider === 'groq') { state.forcedProvider = 'anthropic'; localStorage.setItem('jarvis_forced_provider', 'anthropic'); }
-    if ('groq' in state.providerEnabled) { delete state.providerEnabled.groq; localStorage.setItem('jarvis_provider_enabled', JSON.stringify(state.providerEnabled)); }
   }
 
   try {
@@ -2231,6 +2259,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     const USAGE_DEFAULTS = {
       anthropic: { requests: 0, inputTokens: 0, outputTokens: 0 },
       gemini: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      groq: { requests: 0, inputTokens: 0, outputTokens: 0 },
       openrouter: { requests: 0, inputTokens: 0, outputTokens: 0 },
       openai: { requests: 0, inputTokens: 0, outputTokens: 0 },
       elevenlabs: { requests: 0, characters: 0 },
@@ -2266,7 +2295,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // AUTO-ROUTER
   // Heuristic-based; no LLM call (0ms overhead).
   // ==================================================================
-  const PROVIDER_IDS = ['anthropic', 'gemini', 'openai', 'openrouter'];
+  const PROVIDER_IDS = ['anthropic', 'gemini', 'openai', 'groq', 'openrouter'];
   // A provider is used only if it has a key AND is switched on. Switching off keeps the key.
   function providerActive(p) { return !!state.keys[p] && state.providerEnabled[p] !== false; }
   function activeProviders() { return PROVIDER_IDS.filter(providerActive); }
@@ -2282,8 +2311,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     const text = (userText || '').toLowerCase();
     const has = (p) => available.includes(p);
 
-    // 1. Coding query → Claude, then OpenAI
+    // 1. Coding query → Groq (Qwen Coder) preferred
     if (/\b(kod|code|coding|program|programm|programir|funkcij|function|debug|algoritam|algorithm|python|javascript|typescript|regex|ruby|golang|rust|sql|api|html|css|kompajl|compil|npm|git\s|repo)\b/i.test(text)) {
+      if (has('groq')) return 'groq';
       if (has('anthropic')) return 'anthropic';
       if (has('openai')) return 'openai';
       if (has('openrouter')) return 'openrouter';
@@ -2297,23 +2327,25 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       if (has('openrouter')) return 'openrouter';
     }
 
-    // 3. Short/simple factual → Gemini (fast, free), then OpenAI
+    // 3. Short/simple factual → Groq (fastest)
     if (text.length < 80 || /^\s*(što je|what is|kada|when|gdje|where|tko|who|koliko|how many|how much|zašto|why|koji|which|kako )\b/i.test(text)) {
+      if (has('groq')) return 'groq';
       if (has('gemini')) return 'gemini';
       if (has('openai')) return 'openai';
     }
 
-    // 4. Default: Gemini (free, fast, capable) → Claude → OpenAI → OpenRouter
+    // 4. Default: Gemini (free, fast, capable) → Claude → Groq → OpenRouter
     if (has('gemini')) return 'gemini';
     if (has('anthropic')) return 'anthropic';
     if (has('openai')) return 'openai';
+    if (has('groq')) return 'groq';
     return available[0];
   }
 
   function fallbackChain(primaryProvider) {
     const available = activeProviders();
     // Try providers in this order, primary first
-    const preference = [primaryProvider, 'anthropic', 'gemini', 'openai', 'openrouter'];
+    const preference = [primaryProvider, 'anthropic', 'gemini', 'openai', 'groq', 'openrouter'];
     const seen = new Set();
     const chain = [];
     for (const p of preference) {
@@ -2561,7 +2593,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     card.className = 'card';
     card.innerHTML = `
       <div class="card-header"><span class="card-header-icon">⎘</span> LINK</div>
-      <a class="card-link" href="${input.url}"${/^https?:/i.test(input.url) ? ' target="_blank" rel="noopener"' : ''}>
+      <a class="card-link" href="${input.url}" target="_blank" rel="noopener">
         <div class="card-link-icon">→</div>
         <div class="card-link-content">
           <div class="card-link-title"></div>
@@ -2889,26 +2921,13 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       })
       || null;
   }
-  // WhatsApp needs the international number without "+": 091… → 38591…, 0043… → 43…
-  function whatsappNumber(phone) {
-    const t = String(phone || '').trim();
-    const d = t.replace(/\D/g, '');
-    if (t.startsWith('+')) return d;
-    if (d.startsWith('00')) return d.slice(2);
-    if (d.startsWith('0')) return (state.waCountryCode || '385') + d.slice(1);
-    return d;
-  }
-  function isAndroid() { return /Android/i.test(navigator.userAgent || ''); }
   function buildMessageUrl(phone, message, channel) {
     const encodedMsg = encodeURIComponent(message);
     if (channel === 'whatsapp') {
-      const num = whatsappNumber(phone);
-      const web = `https://wa.me/${num}?text=${encodedMsg}`;
-      // On Android open the WhatsApp app directly (no web page in between);
-      // if WhatsApp isn't installed, Android falls back to the wa.me page.
-      return isAndroid() ? `intent://send?phone=${num}&text=${encodedMsg}#Intent;scheme=whatsapp;S.browser_fallback_url=${encodeURIComponent(web)};end` : web;
+      const digits = phone.replace(/[^\d+]/g, '').replace(/^\+/, '');
+      return `https://wa.me/${digits}?text=${encodedMsg}`;
     }
-    return `sms:${String(phone).replace(/[^\d+]/g, '')}?body=${encodedMsg}`;
+    return `sms:${phone}?body=${encodedMsg}`;
   }
 
   // ==================================================================
@@ -3031,6 +3050,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     state.usageStats = {
       anthropic: { requests: 0, inputTokens: 0, outputTokens: 0 },
       gemini: { requests: 0, inputTokens: 0, outputTokens: 0 },
+      groq: { requests: 0, inputTokens: 0, outputTokens: 0 },
       openrouter: { requests: 0, inputTokens: 0, outputTokens: 0 },
       openai: { requests: 0, inputTokens: 0, outputTokens: 0 },
       elevenlabs: { requests: 0, characters: 0 },
@@ -3056,6 +3076,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     };
     addRow('Claude', s.anthropic.requests, `${formatTokens(s.anthropic.inputTokens)} in / ${formatTokens(s.anthropic.outputTokens)} out`);
     addRow('Gemini', s.gemini.requests, `${formatTokens(s.gemini.inputTokens)} in / ${formatTokens(s.gemini.outputTokens)} out`);
+    addRow('Groq', s.groq.requests, `${formatTokens(s.groq.inputTokens)} in / ${formatTokens(s.groq.outputTokens)} out`);
     if (s.openai) addRow('OpenAI', s.openai.requests, `${formatTokens(s.openai.inputTokens)} in / ${formatTokens(s.openai.outputTokens)} out`);
     addRow('OpenRouter', s.openrouter.requests, `${formatTokens(s.openrouter.inputTokens)} in / ${formatTokens(s.openrouter.outputTokens)} out`);
     addRow('ElevenLabs', s.elevenlabs.requests, `${(s.elevenlabs.characters || 0).toLocaleString()} znakova`);
@@ -3846,15 +3867,7 @@ Rules:
   function daysUntil(date) { const a = new Date(); a.setHours(12, 0, 0, 0); const b = new Date(date); b.setHours(12, 0, 0, 0); return Math.round((b - a) / 86400000); }
   function fmtDateHr(d) { return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}.`; }
   function isoToday() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
-  // Opens WhatsApp / SMS / web links. App links (intent:, sms:) open in place; web pages in a new tab.
-  // Chrome may require a fresh tap; if it refuses, the card with the same link is still there.
-  function openExternal(url) {
-    try {
-      const a = document.createElement('a'); a.href = url; a.style.display = 'none';
-      if (/^https?:/i.test(url)) { a.target = '_blank'; a.rel = 'noopener'; }
-      document.body.appendChild(a); a.click(); a.remove();
-    } catch (e) { /* the card remains as the fallback */ }
-  }
+  function openExternal(url) { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); }
 
   // ---------- One pending "potvrdi / odustani" (clearing the list, saving a warranty) ----------
   let pendingConfirm = null; // { onYes, onNo, until }
@@ -3924,9 +3937,8 @@ Rules:
     const open = loadList(SHOP).filter(i => !i.done);
     if (!open.length) return { error: 'Popis je prazan, nemam što poslati.' };
     const text = 'Popis za kupovinu:\n' + open.map(i => '• ' + i.text).join('\n');
-    const url = buildMessageUrl(c.phone, text, channel === 'sms' ? 'sms' : 'whatsapp');
-    renderLinkCard({ url, title: `${channel === 'sms' ? 'SMS' : 'WhatsApp'}: ${c.name}`, description: `Popis za kupovinu (${open.length})` });
-    return { contact: c, count: open.length, url, channel: channel === 'sms' ? 'sms' : 'whatsapp' };
+    renderLinkCard({ url: buildMessageUrl(c.phone, text, channel === 'sms' ? 'sms' : 'whatsapp'), title: `${channel === 'sms' ? 'SMS' : 'WhatsApp'}: ${c.name}`, description: `Popis za kupovinu (${open.length})` });
+    return { contact: c, count: open.length };
   }
   function askClearShopping() {
     const n = loadList(SHOP).length;
@@ -3944,12 +3956,7 @@ Rules:
       case 'bought': { const r = markBought(items); showShoppingCard(); return r.length ? `Marked as bought: ${r.join(', ')}.` : 'None of those items were on the list.'; }
       case 'list': showShoppingCard(); return shoppingSpoken();
       case 'clear': return askClearShopping() + ' (Nothing deleted yet; the user must say "potvrdi".)';
-      case 'send': {
-        const r = prepareShoppingSend(input.contact_name || '');
-        if (r.error) return r.error;
-        pendingAfterReply = () => openExternal(r.url);
-        return `WhatsApp with the list for ${r.contact.name} opens right after you finish speaking; the user presses send. Say only one short sentence.`;
-      }
+      case 'send': { const r = prepareShoppingSend(input.contact_name || ''); return r.error || `Message card with the list is ready for ${r.contact.name}; the user taps it to send.`; }
     }
     return 'Unknown action.';
   }
@@ -4177,13 +4184,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     m = /^(pošalji|posalji)\s+(mi\s+)?(popis|listu)(\s+za\s+kupovinu)?\s+(.+?)(\s+(sms\w*|porukom|na whatsapp|whatsapp\w*|preko whatsappa))?$/.exec(x);
     if (m) {
       const r = prepareShoppingSend(m[5], m[7] && /sms|porukom/.test(m[7]) ? 'sms' : 'whatsapp');
-      if (r.error) { localReply(t, r.error, lang); return true; }
-      // Like calls: open straight away (closest to the mic tap) and don't talk over the messaging app.
-      openExternal(r.url);
-      const msg = `Otvaram ${r.channel === 'sms' ? 'SMS' : 'WhatsApp'} s popisom za ${r.contact.name}. Pritisni Pošalji.`;
-      addMessage('user', t); addMessage('assistant', msg);
-      state.history.push({ role: 'user', content: t }); state.history.push({ role: 'assistant', content: msg }); persistHistory();
-      setState('idle'); updateMic(); resumeWakeWordIfEnabled();
+      localReply(t, r.error || `Pripremio sam popis za ${r.contact.name}. Tapni karticu da ga pošalješ.`, lang);
       return true;
     }
     if (/^(očisti|ocisti|isprazni|obriši|obrisi|izbriši|izbrisi)\s+(cijeli\s+|sav\s+)?(popis|listu)(\s+za\s+kupovinu)?$/.test(x)) { localReply(t, askClearShopping(), lang); return true; }
@@ -4357,11 +4358,11 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   const THEMES = { plava: 'Plava', zlatna: 'Zlatna', crvena: 'Crvena (Mark III)', zelena: 'Zelena' };
   const ELEVEN_VOICES = { george: ['JBFqnCBsd6RMkjVDRZzb', 'George'], daniel: ['onwK4e9ZLuTAKqWW03F9', 'Daniel'], callum: ['N2lVS1w4EtoT3dr4eOWO', 'Callum'], jessica: ['cgSgspJ2msm6clMCkdW9', 'Jessica'], adam: ['pNInz6obpgDQGcFmaJgB', 'Adam'] };
   const CLAUDE_MODELS = { opus: ['claude-opus-5-5', 'Opus 5.5'], sonnet: ['claude-sonnet-5', 'Sonnet 5'], haiku: ['claude-haiku-4-5-20251001', 'Haiku 4.5'], fable: ['claude-fable-5-1', 'Fable 5.1'] };
-  const PROVIDER_NAMES = { anthropic: 'Claude', gemini: 'Gemini', openai: 'OpenAI', openrouter: 'OpenRouter' };
+  const PROVIDER_NAMES = { anthropic: 'Claude', gemini: 'Gemini', openai: 'OpenAI', groq: 'Groq', openrouter: 'OpenRouter' };
   function providerFromText(v) {
     v = String(v || '').toLowerCase();
     return /claude|anthropic|opus|sonnet|haiku/.test(v) ? 'anthropic' : /gemini/.test(v) ? 'gemini'
-      : /openai|open ai|chatgpt|chat gpt|\bgpt/.test(v) ? 'openai' : /openrouter|open router/.test(v) ? 'openrouter' : null;
+      : /openai|open ai|chatgpt|chat gpt|\bgpt/.test(v) ? 'openai' : /groq/.test(v) ? 'groq' : /openrouter|open router/.test(v) ? 'openrouter' : null;
   }
   let pendingAfterReply = null; // e.g. start/stop wake word only after Jarvis has finished speaking
 
@@ -4410,7 +4411,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       }
       case 'provider': {
         const p = providerFromText(v);
-        if (!p) throw new Error('Provideri su Claude, Gemini, OpenAI i OpenRouter.');
+        if (!p) throw new Error('Provideri su Claude, Gemini, OpenAI, Groq i OpenRouter.');
         state.forcedProvider = p; state.autoRouting = false; state.providerEnabled[p] = true;
         persist('jarvis_forced_provider', p); persist('jarvis_auto_routing', false);
         persist('jarvis_provider_enabled', JSON.stringify(state.providerEnabled)); refreshStatusBar();
@@ -4418,7 +4419,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       }
       case 'provider_enabled': {
         const p = providerFromText(v);
-        if (!p) throw new Error('Modeli su Claude, Gemini, OpenAI i OpenRouter.');
+        if (!p) throw new Error('Modeli su Claude, Gemini, OpenAI, Groq i OpenRouter.');
         const turnOn = /(^|\s)(on|uklju|upal|aktiv|true)/.test(v), turnOff = /(^|\s)(off|isklju|ugas|deaktiv|false)/.test(v);
         if (!turnOn && !turnOff) throw new Error('Reci uključi ili isključi.');
         state.providerEnabled[p] = !turnOff; persist('jarvis_provider_enabled', JSON.stringify(state.providerEnabled)); refreshStatusBar();
@@ -4456,7 +4457,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const words = t.split(/\s+/).length;
     const CHANGE = /\b(promijeni|promjeni|prebaci|stavi|postavi|koristi|uzmi|daj|vrati|switch|change|set|use)\b/;
     const ON = /\b(uključi|ukljuci|upali|aktiviraj|turn on|enable)\b/, OFF = /\b(isključi|iskljuci|ugasi|deaktiviraj|zaustavi|turn off|disable)\b/;
-    const pv = /^(uključi|ukljuci|upali|aktiviraj|isključi|iskljuci|ugasi|deaktiviraj)\s+(mi\s+)?(model\s+)?(claude\w*|gemini\w*|openrouter\w*|open router|openai|open ai|chatgpt\w*|chat gpt|gpt)\b/.exec(t);
+    const pv = /^(uključi|ukljuci|upali|aktiviraj|isključi|iskljuci|ugasi|deaktiviraj)\s+(mi\s+)?(model\s+)?(claude\w*|gemini\w*|groq\w*|openrouter\w*|open router|openai|open ai|chatgpt\w*|chat gpt|gpt)\b/.exec(t);
     if (pv) return { setting: 'provider_enabled', value: `${pv[4]} ${OFF.test(t) ? 'off' : 'on'}` };
     const toggles = [
       ['wake_word', /wake ?word|stalno slušanje|stalno slusanje|budno slušanje|budno slusanje/],
@@ -4472,7 +4473,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (tone && (/^budi\b/.test(t) || (/\b(ton\w*|osobnost\w*)\b/.test(t) && CHANGE.test(t)))) return { setting: 'tone', value: tone[0] };
     const model = /\b(opus|sonnet|haiku|fable)\b/.exec(t);
     if (model && CHANGE.test(t)) return { setting: 'claude_model', value: model[0] };
-    const prov = /\b(koristi|prebaci na|use|switch to)\s+(samo\s+|only\s+)?(claude|gemini|openrouter|openai|chatgpt|gpt)\b/.exec(t);
+    const prov = /\b(koristi|prebaci na|use|switch to)\s+(samo\s+|only\s+)?(claude|gemini|groq|openrouter|openai|chatgpt|gpt)\b/.exec(t);
     if (prov) return { setting: 'provider', value: prov[3] };
     const think = /razmi[sš]lj\w*\s+(na\s+)?(brzo|uravnote\w*|temeljit\w*|duboko|detaljn\w*|normaln\w*)/.exec(t);
     if (think) return { setting: 'thinking', value: think[2] };
@@ -5068,8 +5069,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
             title: `${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}: ${contact.name}`,
             description: toolUse.input.message.length > 50 ? toolUse.input.message.slice(0, 50) + '…' : toolUse.input.message,
           });
-          pendingAfterReply = () => openExternal(url); // open WhatsApp/SMS once the reply has been spoken
-          return `Message card shown for ${contact.name}. ${channel === 'whatsapp' ? 'WhatsApp' : 'The SMS app'} opens right after you finish speaking with the text filled in; the user presses send themselves. Say only one short sentence.`;
+          return `Message card shown for ${contact.name}. The user still needs to tap it and confirm send themselves.`;
         }
         case 'get_expense_summary':
           return getExpenseSummary(toolUse.input.period);
@@ -5894,11 +5894,13 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     $('openaiModel').value = state.models.openai;
     document.querySelectorAll('.provider-enabled').forEach(cb => { cb.checked = state.providerEnabled[cb.dataset.provider] !== false; });
     $('geminiKey').value = state.keys.gemini;
+    $('groqKey').value = state.keys.groq;
     $('openrouterKey').value = state.keys.openrouter;
 
     $('anthropicModel').value = state.models.anthropic;
     $('anthropicEffort').value = state.anthropicEffort;
     $('geminiModel').value = state.models.gemini;
+    $('groqModel').value = state.models.groq;
     $('openrouterModel').value = state.models.openrouter;
     $('openrouterCustom').value = state.models.openrouterCustom;
 
@@ -5941,7 +5943,6 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     $('installAppBtn').style.display = deferredInstallPrompt ? '' : 'none';
     $('versionLabel').textContent = `Verzija ${JARVIS_VERSION}`;
     $('themeSelect').value = state.theme;
-    $('waCountryInput').value = state.waCountryCode;
     $('ideasStatus').textContent = '';
 
     $('settingsModal').dataset.open = 'true';
@@ -5955,17 +5956,17 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     state.models.openai = $('openaiModel').value;
     document.querySelectorAll('.provider-enabled').forEach(cb => { state.providerEnabled[cb.dataset.provider] = cb.checked; });
     state.keys.gemini = $('geminiKey').value.trim();
+    state.keys.groq = $('groqKey').value.trim();
     state.keys.openrouter = $('openrouterKey').value.trim();
 
     state.models.anthropic = $('anthropicModel').value;
     state.anthropicEffort = $('anthropicEffort').value;
     state.theme = $('themeSelect').value;
-    state.waCountryCode = ($('waCountryInput').value || '').replace(/\D/g, '') || '385';
-    localStorage.setItem('jarvis_wa_country', state.waCountryCode);
     localStorage.setItem('jarvis_theme', state.theme);
     applyTheme(state.theme);
     localStorage.setItem('jarvis_anthropic_effort', state.anthropicEffort);
     state.models.gemini = $('geminiModel').value;
+    state.models.groq = $('groqModel').value;
     state.models.openrouter = $('openrouterModel').value;
     state.models.openrouterCustom = $('openrouterCustom').value.trim();
 
@@ -5995,10 +5996,12 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     localStorage.setItem('jarvis_openai_model', state.models.openai);
     localStorage.setItem('jarvis_provider_enabled', JSON.stringify(state.providerEnabled));
     localStorage.setItem('jarvis_gemini_key', state.keys.gemini);
+    localStorage.setItem('jarvis_groq_key', state.keys.groq);
     localStorage.setItem('jarvis_openrouter_key', state.keys.openrouter);
 
     localStorage.setItem('jarvis_anthropic_model', state.models.anthropic);
     localStorage.setItem('jarvis_gemini_model', state.models.gemini);
+    localStorage.setItem('jarvis_groq_model', state.models.groq);
     localStorage.setItem('jarvis_openrouter_model', state.models.openrouter);
     localStorage.setItem('jarvis_openrouter_custom', state.models.openrouterCustom);
 
@@ -6085,7 +6088,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
       'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme',
-      'jarvis_openai_key', 'jarvis_openai_model', 'jarvis_provider_enabled', 'jarvis_wa_country',
+      'jarvis_openai_key', 'jarvis_openai_model', 'jarvis_provider_enabled',
       'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_last_notice_date',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
@@ -6146,7 +6149,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
-  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;
@@ -6323,7 +6326,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
 
   // Live update tab indicators as user types keys
   document.querySelectorAll('.provider-enabled').forEach(cb => cb.addEventListener('change', updateProviderTabIndicators));
-  ['anthropicKey', 'geminiKey', 'openaiKey', 'openrouterKey'].forEach(id => {
+  ['anthropicKey', 'geminiKey', 'openaiKey', 'groqKey', 'openrouterKey'].forEach(id => {
     $(id).addEventListener('input', updateProviderTabIndicators);
   });
 

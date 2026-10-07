@@ -55,7 +55,8 @@ const hasThinkingBefore = (msgs) => { let last = -1; msgs.forEach((m, i) => { if
   console.log('--- 1. Zamjena zastarjelih modela ---');
   click($('settingsBtn')); await sleep(30);
   pass($('anthropicModel').value === 'claude-sonnet-5', 'Sonnet 4.6 → Sonnet 5');
-  pass($('groqModel').value === 'openai/gpt-oss-120b', 'Groq Compound (ne podržava alate) → GPT-OSS 120B');
+  pass(!$('groqModel') && !d.querySelector('.provider-tab[data-provider="groq"]') && ![...$('forcedProviderSelect').options].some(o => o.value === 'groq'), 'Groq uklonjen iz postavki');
+  pass(w.localStorage.getItem('jarvis_groq_key') === null && w.localStorage.getItem('jarvis_groq_model') === null, 'Stari Groq ključ i model obrisani iz preglednika');
   pass($('anthropicEffort').value === 'low', 'Brzina razmišljanja: zadano "Brzo"');
   click($('closeSettings'));
   await setModel('anthropic', 'claude-opus-5-5');
@@ -95,14 +96,6 @@ const hasThinkingBefore = (msgs) => { let last = -1; msgs.forEach((m, i) => { if
   anthropicScript = [{ content: [{ type: 'text', text: 'Haiku.' }], stop_reason: 'end_turn', usage: {} }];
   await say('pozdrav');
   pass(!('output_config' in A[A.length - 1]) && A[A.length - 1].max_tokens === 1500, 'Haiku: bez effort parametra');
-
-  console.log('--- 6. Groq Qwen 3.8 ---');
-  await setModel('groq', 'qwen/qwen3.8-27b');
-  groqScript = [{ choices: [{ message: { content: '<think>Korisnik pozdravlja.</think>Dobar dan, gospodine.' }, finish_reason: 'stop' }], usage: {} }];
-  await say('dobar dan');
-  pass(Q[0].model === 'qwen/qwen3.8-27b' && Q[0].reasoning_format === 'hidden', 'Qwen: razmišljanje skriveno na strani Groqa');
-  pass(lastText() === 'Dobar dan, gospodine.', 'I kad se <think> pojavi, ne izgovara se');
-  pass(Q[0].messages.every(m => m.role !== 'assistant' || m.content || m.tool_calls), 'Odgovor koji je bio samo razmišljanje ne šalje se kao prazna poruka');
 
   console.log('--- 7. Gemini 3.8 Flash ---');
   await setModel('gemini', 'gemini-3.8-flash');

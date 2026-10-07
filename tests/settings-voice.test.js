@@ -102,7 +102,7 @@ const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
 
   console.log('--- 5. Postavke dodirom ---');
   click($('settingsBtn')); await sleep(40);
-  pass($('versionLabel').textContent === 'Verzija 8.8', 'Verzija 8.8 u postavkama');
+  pass($('versionLabel').textContent === 'Verzija 8.9', 'Verzija 8.9 u postavkama');
   pass($('themeSelect').options.length === 4 && $('themeSelect').value === 'plava', 'Izbornik tema prikazuje trenutnu temu');
   $('themeSelect').value = 'zelena'; click($('saveSettings')); await sleep(40);
   pass(theme() === 'zelena' && ls('jarvis_theme') === 'zelena', 'Odabir teme u postavkama i Save → tema primijenjena');
