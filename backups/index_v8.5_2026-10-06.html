@@ -23,25 +23,8 @@
     --red: #ff4d4d;
     --text: #c8e8ff;
     --text-dim: #5a7a92;
-    --accent-rgb: 77, 214, 255;
-    --gold-rgb: 255, 181, 71;
-    --border: rgba(var(--accent-rgb), 0.25);
-    --border-strong: rgba(var(--accent-rgb), 0.6);
-  }
-  /* Colour themes — every accent colour in the interface comes from these variables */
-  :root[data-theme="zlatna"] {
-    --cyan: #ffb547; --cyan-bright: #ffe2a8; --cyan-dim: #8a5a12; --accent-rgb: 255, 181, 71;
-    --gold: #4dd6ff; --gold-rgb: 77, 214, 255;
-    --text: #f4e8d2; --text-dim: #8f7b5c;
-  }
-  :root[data-theme="crvena"] {
-    --cyan: #ff5a36; --cyan-bright: #ffb39e; --cyan-dim: #7a2412; --accent-rgb: 255, 90, 54;
-    --gold: #ffcc33; --gold-rgb: 255, 204, 51; --red: #ff2f6e;
-    --text: #f5ddd5; --text-dim: #937069;
-  }
-  :root[data-theme="zelena"] {
-    --cyan: #4dff9a; --cyan-bright: #bdffd8; --cyan-dim: #16794a; --accent-rgb: 77, 255, 154;
-    --text: #d3f5e2; --text-dim: #5f8c74;
+    --border: rgba(77, 214, 255, 0.25);
+    --border-strong: rgba(77, 214, 255, 0.6);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,8 +45,8 @@
     content: '';
     position: fixed; inset: 0;
     background-image:
-      linear-gradient(rgba(var(--accent-rgb), 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(var(--accent-rgb), 0.04) 1px, transparent 1px);
+      linear-gradient(rgba(77, 214, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(77, 214, 255, 0.04) 1px, transparent 1px);
     background-size: 40px 40px;
     pointer-events: none;
     z-index: 0;
@@ -73,7 +56,7 @@
     position: fixed; inset: 0;
     background:
       radial-gradient(circle at 50% 50%, transparent 0%, rgba(0,3,8,0.7) 80%),
-      repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(var(--accent-rgb), 0.025) 2px, rgba(var(--accent-rgb), 0.025) 3px);
+      repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(77,214,255,0.025) 2px, rgba(77,214,255,0.025) 3px);
     pointer-events: none;
     z-index: 1;
   }
@@ -109,7 +92,7 @@
     transition: all 0.2s; font-family: inherit; font-size: 14px;
   }
   .icon-btn:hover, .icon-btn:active {
-    background: rgba(var(--accent-rgb), 0.1);
+    background: rgba(77, 214, 255, 0.1);
     border-color: var(--cyan); color: var(--cyan-bright);
   }
 
@@ -143,7 +126,7 @@
   .core {
     position: absolute; inset: 32%; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, var(--cyan-bright), var(--cyan) 30%, var(--cyan-dim) 60%, transparent 75%);
-    box-shadow: 0 0 40px var(--cyan), 0 0 80px rgba(var(--accent-rgb), 0.5), inset 0 0 30px rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 40px var(--cyan), 0 0 80px rgba(77, 214, 255, 0.5), inset 0 0 30px rgba(255, 255, 255, 0.3);
     animation: breathe 3s ease-in-out infinite;
   }
   @keyframes breathe {
@@ -159,7 +142,7 @@
   .reactor-wrap[data-state="listening"] .ring-3 { animation-duration: 2s; border-color: var(--cyan-bright); }
   .reactor-wrap[data-state="thinking"] .core {
     background: radial-gradient(circle at 35% 30%, var(--gold), #ff8c00 30%, #663300 60%, transparent 75%);
-    box-shadow: 0 0 40px var(--gold), 0 0 80px rgba(var(--gold-rgb), 0.5);
+    box-shadow: 0 0 40px var(--gold), 0 0 80px rgba(255, 181, 71, 0.5);
     animation: spin-think 2s linear infinite;
   }
   @keyframes spin-think { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
@@ -204,9 +187,9 @@
   }
   .msg-label .provider-tag {
     font-size: 8px; padding: 1px 5px;
-    background: rgba(var(--gold-rgb), 0.15);
+    background: rgba(255, 181, 71, 0.15);
     color: var(--gold);
-    border: 1px solid rgba(var(--gold-rgb), 0.4);
+    border: 1px solid rgba(255, 181, 71, 0.4);
     border-radius: 2px;
     letter-spacing: 0.2em;
   }
@@ -214,12 +197,12 @@
   .msg-error .msg-label { color: var(--red); }
   .msg-error .msg-text { color: #ff9999; }
   .msg-text { color: var(--text); padding-left: 10px; border-left: 1px solid var(--border); }
-  .msg-user .msg-text { border-left-color: rgba(var(--gold-rgb), 0.4); }
+  .msg-user .msg-text { border-left-color: rgba(255, 181, 71, 0.4); }
   .msg-interim .msg-text { color: var(--text-dim); font-style: italic; }
 
   .card {
     margin: 8px 0 0 10px; border: 1px solid var(--border);
-    background: rgba(var(--accent-rgb), 0.04);
+    background: rgba(77, 214, 255, 0.04);
     overflow: hidden; position: relative;
     animation: fade-in 0.3s ease-out;
   }
@@ -238,7 +221,7 @@
     padding: 14px; cursor: pointer; transition: background 0.2s;
     text-decoration: none; color: inherit;
   }
-  .card-link:hover, .card-link:active { background: rgba(var(--accent-rgb), 0.1); }
+  .card-link:hover, .card-link:active { background: rgba(77, 214, 255, 0.1); }
   .card-link-icon {
     width: 38px; height: 38px; flex-shrink: 0;
     border: 1px solid var(--cyan); border-radius: 4px;
@@ -294,7 +277,7 @@
   /* Wake word badge */
   .wake-badge {
     font-size: 9px; color: var(--gold);
-    border: 1px solid rgba(var(--gold-rgb), 0.4);
+    border: 1px solid rgba(255, 181, 71, 0.4);
     padding: 2px 6px; border-radius: 3px;
     letter-spacing: 0.15em;
     animation: pulse-dot 2s ease-in-out infinite;
@@ -305,7 +288,7 @@
   .reminder-item {
     display: flex; justify-content: space-between; align-items: center;
     padding: 8px 10px; border: 1px solid var(--border);
-    background: rgba(var(--accent-rgb), 0.04); font-size: 12px;
+    background: rgba(77, 214, 255, 0.04); font-size: 12px;
   }
   .reminder-item .reminder-time { color: var(--gold); font-size: 10px; margin-top: 2px; }
   .reminder-item button {
@@ -317,7 +300,7 @@
 
   /* Calendar card */
   .calendar-list { padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
-  .calendar-item { padding: 8px 10px; border-left: 2px solid var(--cyan); background: rgba(var(--accent-rgb), 0.04); }
+  .calendar-item { padding: 8px 10px; border-left: 2px solid var(--cyan); background: rgba(77, 214, 255, 0.04); }
   .calendar-item-title { font-size: 13px; color: var(--cyan-bright); }
   .calendar-item-time { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
@@ -335,7 +318,7 @@
   .usage-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 8px 10px; border: 1px solid var(--border);
-    background: rgba(var(--accent-rgb), 0.04); font-size: 11px;
+    background: rgba(77, 214, 255, 0.04); font-size: 11px;
   }
   .usage-row .usage-name { color: var(--cyan-bright); font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 0.1em; }
   .usage-row .usage-numbers { color: var(--text-dim); text-align: right; }
@@ -378,7 +361,7 @@
   .camera-btn {
     width: 52px; height: 52px; border-radius: 50%;
     border: 2px solid var(--border-strong);
-    background: rgba(var(--accent-rgb), 0.05);
+    background: rgba(77, 214, 255, 0.05);
     color: var(--cyan);
     font-size: 20px;
     display: grid; place-items: center;
@@ -386,26 +369,26 @@
     transition: all 0.2s;
     flex-shrink: 0;
   }
-  .camera-btn:active { transform: scale(0.92); background: rgba(var(--accent-rgb), 0.15); }
+  .camera-btn:active { transform: scale(0.92); background: rgba(77, 214, 255, 0.15); }
   .camera-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .mic-btn {
     position: relative; width: 84px; height: 84px;
     border-radius: 50%; border: 2px solid var(--cyan);
-    background: radial-gradient(circle, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.05));
+    background: radial-gradient(circle, rgba(77,214,255,0.2), rgba(77,214,255,0.05));
     color: var(--cyan-bright); font-size: 32px; cursor: pointer;
     display: grid; place-items: center; transition: all 0.2s;
-    font-family: inherit; box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.3);
+    font-family: inherit; box-shadow: 0 0 20px rgba(77, 214, 255, 0.3);
   }
   .mic-btn:active { transform: scale(0.95); }
   .mic-btn[data-active="true"] {
     background: radial-gradient(circle, var(--cyan), var(--cyan-dim));
     color: #000;
-    box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(var(--accent-rgb), 0.5);
+    box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(77, 214, 255, 0.5);
     animation: mic-pulse 1s ease-in-out infinite;
   }
   @keyframes mic-pulse {
-    0%, 100% { box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(var(--accent-rgb), 0.5); }
-    50% { box-shadow: 0 0 50px var(--cyan), 0 0 90px rgba(var(--accent-rgb), 0.8); }
+    0%, 100% { box-shadow: 0 0 30px var(--cyan), 0 0 60px rgba(77, 214, 255, 0.5); }
+    50% { box-shadow: 0 0 50px var(--cyan), 0 0 90px rgba(77, 214, 255, 0.8); }
   }
   .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
   .mic-hint { font-size: 10px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
@@ -420,7 +403,7 @@
   .modal-backdrop[data-open="true"] { display: flex; }
   .modal {
     background: var(--bg); border: 1px solid var(--cyan);
-    box-shadow: 0 0 40px rgba(var(--accent-rgb), 0.3);
+    box-shadow: 0 0 40px rgba(77, 214, 255, 0.3);
     width: 100%; max-width: 440px; max-height: 90vh;
     overflow-y: auto; padding: 24px; position: relative;
   }
@@ -449,7 +432,7 @@
   }
   .field input, .field select {
     width: 100%;
-    background: rgba(var(--accent-rgb), 0.05);
+    background: rgba(77, 214, 255, 0.05);
     border: 1px solid var(--border); color: var(--text);
     padding: 10px 12px;
     font-family: 'JetBrains Mono', monospace; font-size: 13px;
@@ -627,7 +610,7 @@
   .rz-price-row label { flex: 1; color: var(--text); }
   .rz-price-row input {
     width: 104px; padding: 7px 8px; text-align: right;
-    background: rgba(var(--accent-rgb), 0.05); border: 1px solid var(--border); color: var(--cyan-bright);
+    background: rgba(77, 214, 255, 0.05); border: 1px solid var(--border); color: var(--cyan-bright);
     font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none;
   }
   .rz-price-row input:focus { border-color: var(--cyan); }
@@ -645,12 +628,12 @@
     display: flex; align-items: center; gap: 14px; padding: 14px 16px;
     text-decoration: none; color: inherit; cursor: pointer;
   }
-  .call-btn:active { background: rgba(var(--gold-rgb), 0.12); }
+  .call-btn:active { background: rgba(255, 181, 71, 0.12); }
   .call-icon {
     width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%;
     border: 2px solid var(--gold); color: var(--gold);
     display: grid; place-items: center; font-size: 20px;
-    box-shadow: 0 0 14px rgba(var(--gold-rgb), 0.35);
+    box-shadow: 0 0 14px rgba(255, 181, 71, 0.35);
   }
   .call-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .call-name { font-size: 14px; color: var(--cyan-bright); }
@@ -659,15 +642,15 @@
 
   .warning {
     padding: 10px 12px;
-    border: 1px solid rgba(var(--gold-rgb), 0.4);
-    background: rgba(var(--gold-rgb), 0.05);
+    border: 1px solid rgba(255, 181, 71, 0.4);
+    background: rgba(255, 181, 71, 0.05);
     color: var(--gold); font-size: 11px;
     line-height: 1.5; margin-bottom: 16px;
   }
   .info-note {
     padding: 8px 10px;
     border-left: 2px solid var(--cyan);
-    background: rgba(var(--accent-rgb), 0.05);
+    background: rgba(77, 214, 255, 0.05);
     color: var(--text-dim); font-size: 11px;
     line-height: 1.5; margin: 10px 0;
   }
@@ -689,7 +672,7 @@
   .toggle-slider {
     position: absolute; cursor: pointer;
     inset: 0;
-    background: rgba(var(--accent-rgb), 0.15);
+    background: rgba(77, 214, 255, 0.15);
     border: 1px solid var(--border);
     transition: 0.2s;
     border-radius: 22px;
@@ -703,7 +686,7 @@
     border-radius: 50%;
   }
   .toggle input:checked + .toggle-slider {
-    background: rgba(var(--accent-rgb), 0.3);
+    background: rgba(77, 214, 255, 0.3);
     border-color: var(--cyan);
   }
   .toggle input:checked + .toggle-slider::before {
@@ -1010,20 +993,6 @@
       Kontakt dodaješ i glasom ("spremi kontakt Martina 091 234 5678") ili iz imenika telefona (odabereš jednog ili više). Koristi se za "nazovi [ime]" i "pošalji [ime] poruku..." — Jarvis otvori karticu s poveznicom na već napisanu SMS/WhatsApp poruku; ti tapneš i sam potvrđuješ slanje (Jarvis ne šalje ništa sam od sebe).
     </div>
 
-    <h3>Izgled</h3>
-    <div class="field">
-      <label>Tema boja</label>
-      <select id="themeSelect">
-        <option value="plava">Plava — klasični JARVIS</option>
-        <option value="zlatna">Zlatna</option>
-        <option value="crvena">Crvena — Mark III</option>
-        <option value="zelena">Zelena</option>
-      </select>
-    </div>
-    <div class="info-note">
-      Glasom možeš mijenjati: temu ("promijeni temu u crvenu"), ton ("budi sarkastičan"), Claude model ("koristi Opus"), brzinu razmišljanja ("razmišljaj temeljito"), providera ("koristi samo Gemini"), auto-routing, wake word, kontinuirani razgovor, animaciju paljenja, jutarnji brifing i glas ("promijeni glas na Daniel"). API ključevi, brisanja i veze s bazama mijenjaju se samo ovdje.
-    </div>
-
     <h3>Personality</h3>
     <div class="field">
       <label>Ton odgovora</label>
@@ -1243,7 +1212,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '8.6';
+  const JARVIS_VERSION = '8.5';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1281,13 +1250,10 @@ Tools available:
 - get_utility_prices — questions about current utility prices or fixed fees.
 - update_utility_price — the user wants to change a utility price or fee. Needs confirmation, like readings.
 - delete_last_meter_reading — the user wants to delete the latest meter reading (they enter a password on screen).
-- change_setting — the user wants to change your theme/colours, tone, Claude model, thinking speed, provider, auto-routing, wake word, continuous conversation, boot animation, morning briefing or voice.
-- save_idea — save an idea for a future upgrade (after the user agrees, or when they ask you to note an idea).
 - save_contact — the user wants to save someone's phone number as a contact. It is not saved until the user confirms.
 - make_phone_call — the user asks you to call someone (nazovi, pozovi). It only opens the dialer with the number filled in; the user presses call. Never claim the call has started.
 - open_utilities_app — the user wants to see or open režije (table, entry form, charts, prices) on screen.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
-You cannot change your own code, layout, fonts or features. The ONLY things about yourself you can change are the options of change_setting. If the user asks for any other change to you or your interface, say plainly that you cannot do that yourself and ask whether to save it as an idea for a future upgrade (in Croatian: "Želiš li da to zapišem kao novu ideju?"); if they agree, call save_idea. Never claim a change that a tool did not confirm.
 
 For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
 For all other tools: call directly, then briefly summarize the result in speech.`;
@@ -1517,28 +1483,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       name: 'delete_last_meter_reading',
       description: 'Delete the most recent meter reading. The user must enter the delete password on screen.',
       input_schema: { type: 'object', properties: {} }
-    },
-    {
-      name: 'change_setting',
-      description: "Change one of Jarvis's own predefined settings. These settings are the ONLY things about yourself you can change — never code, layout, fonts, new colours or anything else.",
-      input_schema: {
-        type: 'object',
-        properties: {
-          setting: { type: 'string', enum: ['theme', 'tone', 'claude_model', 'thinking', 'provider', 'auto_routing', 'wake_word', 'continuous', 'boot_animation', 'morning_briefing', 'voice'],
-            description: 'theme: plava|zlatna|crvena|zelena. tone: profesionalan|balansiran|sarkastičan. claude_model: opus|sonnet|haiku|fable. thinking: brzo|uravnoteženo|temeljito. provider: claude|gemini|groq|openrouter. auto_routing, wake_word, continuous, boot_animation, morning_briefing: on|off. voice: george|daniel|callum|jessica|adam.' },
-          value: { type: 'string', description: 'New value, one of the options listed for the setting.' }
-        },
-        required: ['setting', 'value']
-      }
-    },
-    {
-      name: 'save_idea',
-      description: 'Save an idea for a future Jarvis upgrade in the ideas notebook. Use when the user asks for something you cannot do yourself and agrees to save it as an idea, or asks you to note an idea.',
-      input_schema: {
-        type: 'object',
-        properties: { text: { type: 'string', description: 'The idea, as a short self-contained sentence in the user\'s language.' } },
-        required: ['text']
-      }
     },
     {
       name: 'save_contact',
@@ -2002,7 +1946,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     rezijeAppUrl: localStorage.getItem('jarvis_rezije_app_url') || '',
     rezijeTitle: localStorage.getItem('jarvis_rezije_title') || '',
     anthropicEffort: localStorage.getItem('jarvis_anthropic_effort') || 'low',
-    theme: localStorage.getItem('jarvis_theme') || 'plava',
     // Runtime
     history: [],
     recognition: null,
@@ -3613,122 +3556,6 @@ Rules:
     await localReply(t, 'Tapni Otvori imenik i odaberi kontakte.', lang, true);
   }
 
-  // ---------- Settings by voice (only safe, predefined options) ----------
-  const THEMES = { plava: 'Plava', zlatna: 'Zlatna', crvena: 'Crvena (Mark III)', zelena: 'Zelena' };
-  const ELEVEN_VOICES = { george: ['JBFqnCBsd6RMkjVDRZzb', 'George'], daniel: ['onwK4e9ZLuTAKqWW03F9', 'Daniel'], callum: ['N2lVS1w4EtoT3dr4eOWO', 'Callum'], jessica: ['cgSgspJ2msm6clMCkdW9', 'Jessica'], adam: ['pNInz6obpgDQGcFmaJgB', 'Adam'] };
-  const CLAUDE_MODELS = { opus: ['claude-opus-5-5', 'Opus 5.5'], sonnet: ['claude-sonnet-5', 'Sonnet 5'], haiku: ['claude-haiku-4-5-20251001', 'Haiku 4.5'], fable: ['claude-fable-5-1', 'Fable 5.1'] };
-  const PROVIDER_NAMES = { anthropic: 'Claude', gemini: 'Gemini', groq: 'Groq', openrouter: 'OpenRouter' };
-  let pendingAfterReply = null; // e.g. start/stop wake word only after Jarvis has finished speaking
-
-  function applyTheme(name) {
-    const t = THEMES[name] ? name : 'plava';
-    if (t === 'plava') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = t;
-  }
-  function persist(key, value) { try { localStorage.setItem(key, String(value)); } catch {} }
-
-  // Applies one setting; returns { msg, after? } or throws with a spoken explanation.
-  function applySetting(setting, value) {
-    const v = String(value ?? '').toLowerCase().trim();
-    const on = /^(on|true|uključ|ukljuc|upal|da\b|yes|aktiv|pokren)/.test(v);
-    const off = /^(off|false|isključ|iskljuc|ugas|ne\b|no\b|deaktiv|zaustav)/.test(v);
-    const toggle = (key, stateKey, yes, no) => {
-      if (!on && !off) throw new Error('Reci uključi ili isključi.');
-      state[stateKey] = on; persist(key, on);
-      return on ? yes : no;
-    };
-    switch (setting) {
-      case 'theme': {
-        const t = /plav|blue|klasi/.test(v) ? 'plava' : /zlat|žut|zut|gold|yellow/.test(v) ? 'zlatna'
-          : /crven|red|mark/.test(v) ? 'crvena' : /zelen|green/.test(v) ? 'zelena' : null;
-        if (!t) throw new Error(`Imam ove teme: ${Object.values(THEMES).join(', ')}.`);
-        state.theme = t; persist('jarvis_theme', t); applyTheme(t);
-        return { msg: `Tema je sada ${THEMES[t]}.` };
-      }
-      case 'tone': {
-        const p = /profes|ozbilj|formal/.test(v) ? 0 : /sarkas|duhovit|tony|šaljiv|saljiv|ironi/.test(v) ? 2 : /balans|uravnot|normal|obič|obic/.test(v) ? 1 : null;
-        if (p === null) throw new Error('Ton može biti profesionalan, balansiran ili sarkastičan.');
-        state.personality = p; persist('jarvis_personality', p);
-        return { msg: ['Od sada sam strogo profesionalan.', 'Vraćam se na balansiran ton.', 'Sarkastični način uključen. Pokušat ću se suzdržati. Malo.'][p] };
-      }
-      case 'claude_model': {
-        const k = Object.keys(CLAUDE_MODELS).find(m => v.includes(m));
-        if (!k) throw new Error('Claude modeli su Opus, Sonnet, Haiku i Fable.');
-        state.models.anthropic = CLAUDE_MODELS[k][0]; persist('jarvis_anthropic_model', state.models.anthropic);
-        return { msg: `Claude model je sada ${CLAUDE_MODELS[k][1]}.` + (k === 'fable' ? ' To je najskuplji model.' : '') + (state.keys.anthropic ? '' : ' Pazi: nema upisanog Anthropic ključa.') };
-      }
-      case 'thinking': {
-        const e = /brz|krat|low|fast/.test(v) ? 'low' : /temelj|dub|detalj|high|deep/.test(v) ? 'high' : /uravnot|normal|srednj|medium/.test(v) ? 'medium' : null;
-        if (!e) throw new Error('Razmišljanje može biti brzo, uravnoteženo ili temeljito.');
-        state.anthropicEffort = e; persist('jarvis_anthropic_effort', e);
-        return { msg: { low: 'Razmišljam brzo.', medium: 'Razmišljam uravnoteženo.', high: 'Razmišljat ću temeljito; odgovori će biti sporiji.' }[e] };
-      }
-      case 'provider': {
-        const p = /claude|anthropic/.test(v) ? 'anthropic' : /gemini/.test(v) ? 'gemini' : /groq/.test(v) ? 'groq' : /openrouter|open router/.test(v) ? 'openrouter' : null;
-        if (!p) throw new Error('Provideri su Claude, Gemini, Groq i OpenRouter.');
-        state.forcedProvider = p; state.autoRouting = false;
-        persist('jarvis_forced_provider', p); persist('jarvis_auto_routing', false); refreshStatusBar();
-        return { msg: `Koristim samo ${PROVIDER_NAMES[p]}.` + (state.keys[p] ? '' : ' Pazi: za njega nema upisanog ključa.') };
-      }
-      case 'auto_routing': {
-        const msg = toggle('jarvis_auto_routing', 'autoRouting', 'Automatski odabir modela je uključen.', `Automatski odabir je isključen; koristim ${PROVIDER_NAMES[state.forcedProvider] || 'Claude'}.`);
-        refreshStatusBar(); return { msg };
-      }
-      case 'wake_word':
-        return { msg: toggle('jarvis_wake_word', 'wakeWordEnabled', 'Stalno slušanje je uključeno.', 'Stalno slušanje je isključeno.'), after: () => syncWakeWordListening() };
-      case 'continuous':
-        return { msg: toggle('jarvis_continuous_conv', 'continuousConversation', 'Kontinuirani razgovor je uključen.', 'Kontinuirani razgovor je isključen.') };
-      case 'boot_animation':
-        return { msg: toggle('jarvis_boot_sequence', 'bootSequenceEnabled', 'Animacija paljenja je uključena.', 'Animacija paljenja je isključena.') };
-      case 'morning_briefing':
-        return { msg: toggle('jarvis_morning_briefing', 'morningBriefingEnabled', 'Jutarnji brifing je uključen.', 'Jutarnji brifing je isključen.') };
-      case 'voice': {
-        const k = Object.keys(ELEVEN_VOICES).find(n => v.includes(n));
-        if (!k) throw new Error('Glasovi su George, Daniel, Callum, Jessica i Adam.');
-        state.elevenVoice = ELEVEN_VOICES[k][0]; persist('jarvis_eleven_voice', state.elevenVoice);
-        return { msg: `Glas je sada ${ELEVEN_VOICES[k][1]}.` + (state.elevenKey ? '' : ' Taj glas čuje se samo uz ElevenLabs ključ.') };
-      }
-      default:
-        throw new Error('Tu postavku ne mogu mijenjati glasom.');
-    }
-  }
-
-  // Fast local recognition of the most common phrasings (no AI model needed).
-  function matchSettingIntent(text) {
-    const t = text.toLowerCase().replace(/[.!?]+$/, '').trim();
-    const words = t.split(/\s+/).length;
-    const CHANGE = /\b(promijeni|promjeni|prebaci|stavi|postavi|koristi|uzmi|daj|vrati|switch|change|set|use)\b/;
-    const ON = /\b(uključi|ukljuci|upali|aktiviraj|turn on|enable)\b/, OFF = /\b(isključi|iskljuci|ugasi|deaktiviraj|zaustavi|turn off|disable)\b/;
-    const toggles = [
-      ['wake_word', /wake ?word|stalno slušanje|stalno slusanje|budno slušanje|budno slusanje/],
-      ['continuous', /kontinuiran\w*|automatsko slušanje|automatsko slusanje/],
-      ['boot_animation', /animacij\w*/],
-      ['morning_briefing', /jutarnj\w*|brifing\w*/],
-      ['auto_routing', /auto.?routing|automatsk\w* odabir\w*/],
-    ];
-    for (const [s, re] of toggles) if (re.test(t) && (ON.test(t) || OFF.test(t))) return { setting: s, value: OFF.test(t) ? 'off' : 'on' };
-    const color = /\b(plav\w*|zlat\w*|žut\w*|zut\w*|crven\w*|zelen\w*|mark\s*(3|iii|tri))\b/.exec(t);
-    if (color && /\b(tem\w*|boj\w*|sučelj\w*|sucelj\w*|izgled\w*|mark)\b/.test(t) && (CHANGE.test(t) || words <= 3)) return { setting: 'theme', value: color[0] };
-    const tone = /\b(profesional\w*|ozbiljn\w*|formaln\w*|sarkasti\w*|duhovit\w*|balansiran\w*|uravnote\w*|normaln\w*)\b/.exec(t);
-    if (tone && (/^budi\b/.test(t) || (/\b(ton\w*|osobnost\w*)\b/.test(t) && CHANGE.test(t)))) return { setting: 'tone', value: tone[0] };
-    const model = /\b(opus|sonnet|haiku|fable)\b/.exec(t);
-    if (model && CHANGE.test(t)) return { setting: 'claude_model', value: model[0] };
-    const prov = /\b(koristi|prebaci na|use|switch to)\s+(samo\s+|only\s+)?(claude|gemini|groq|openrouter)\b/.exec(t);
-    if (prov) return { setting: 'provider', value: prov[3] };
-    const think = /razmi[sš]lj\w*\s+(na\s+)?(brzo|uravnote\w*|temeljit\w*|duboko|detaljn\w*|normaln\w*)/.exec(t);
-    if (think) return { setting: 'thinking', value: think[2] };
-    const voice = /\bglas\w*\s+(na\s+)?(george|daniel|callum|jessica|adam)\b/.exec(t);
-    if (voice && CHANGE.test(t)) return { setting: 'voice', value: voice[2] };
-    return null;
-  }
-  async function voiceApplySetting(userText, intent, lang) {
-    let r;
-    try { r = applySetting(intent.setting, intent.value); }
-    catch (e) { await localReply(userText, e.message, lang); return; }
-    await localReply(userText, r.msg, lang);
-    if (r.after) r.after();
-  }
-
   // ---------- Ideas notebook ("Jarvis, nova ideja: …") ----------
   // Ideas are only written down here; they never change Jarvis's code.
   let pendingIdeaUntil = 0; // after "nova ideja" with nothing else, the next utterance is the idea
@@ -3839,8 +3666,6 @@ Rules:
     // Only handled locally when a number was actually spoken; otherwise the AI model
     // takes it (it can ask for the number, e.g. "zapamti mi broj od susjeda").
     if (newContact && newContact.phone) { voiceSaveContact(t, newContact, lang); return; }
-    const settingIntent = matchSettingIntent(t);
-    if (settingIntent) { voiceApplySetting(t, settingIntent, lang); return; }
     const panel = rezijePanelIntent(t);
     if (panel) {
       if (panel.action === 'close') { closeRezijePanel(); localReply(t, 'Zatvaram režije.', lang); }
@@ -4328,19 +4153,6 @@ Rules:
         }
         case 'delete_last_meter_reading':
           return await utilDeleteLast();
-        case 'change_setting': {
-          try {
-            const r = applySetting(toolUse.input.setting, toolUse.input.value);
-            if (r.after) pendingAfterReply = r.after;
-            return 'Done: ' + r.msg;
-          } catch (e) { return 'NOT changed: ' + e.message; }
-        }
-        case 'save_idea': {
-          const idea = addIdea(toolUse.input.text);
-          if (!idea) return 'Empty idea, nothing saved.';
-          utilCard(null, 'NOVA IDEJA', `<div class="util-row"><span class="util-v" style="text-align:left;">${escapeHtml(idea.text)}</span></div>`, [], '💡');
-          return `Idea saved (${loadIdeas().length} in total).`;
-        }
         case 'save_contact': {
           const phone = spokenToPhone(String(toolUse.input.phone || ''));
           const name = cleanContactName(String(toolUse.input.name || ''));
@@ -5061,7 +4873,6 @@ Rules:
       state.processing = false;
       if (reply) await speak(reply, lang); // speak()'s finally resumes wake word
       else { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); }
-      if (pendingAfterReply) { const fn = pendingAfterReply; pendingAfterReply = null; try { fn(); } catch {} }
       if (pendingCall) {
         const phone = pendingCall;
         pendingCall = null;
@@ -5136,7 +4947,6 @@ Rules:
     renderUsageStats();
     renderIdeasInSettings();
     $('versionLabel').textContent = `Verzija ${JARVIS_VERSION}`;
-    $('themeSelect').value = state.theme;
     $('ideasStatus').textContent = '';
 
     $('settingsModal').dataset.open = 'true';
@@ -5152,9 +4962,6 @@ Rules:
 
     state.models.anthropic = $('anthropicModel').value;
     state.anthropicEffort = $('anthropicEffort').value;
-    state.theme = $('themeSelect').value;
-    localStorage.setItem('jarvis_theme', state.theme);
-    applyTheme(state.theme);
     localStorage.setItem('jarvis_anthropic_effort', state.anthropicEffort);
     state.models.gemini = $('geminiModel').value;
     state.models.groq = $('groqModel').value;
@@ -5275,7 +5082,7 @@ Rules:
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
-      'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme',
+      'jarvis_anthropic_effort', 'jarvis_ideas',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
       'jarvis_eleven_key', 'jarvis_eleven_voice', 'jarvis_lang', 'jarvis_pitch',
       'jarvis_history',
@@ -5532,7 +5339,6 @@ Rules:
   if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
 
   // Boot sequence animation, or skip straight past it if disabled
-  applyTheme(state.theme);
   if (state.bootSequenceEnabled) runBootSequence();
   else { const bo = $('bootOverlay'); if (bo) bo.remove(); }
 

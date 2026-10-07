@@ -22,3 +22,4 @@ npm test
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
 | `ideas.test.js` | Bilježnica ideja, "Jarvis," ispred naredbi, broj verzije |
+| `settings-voice.test.js` | Teme boja, postavke glasom, alat change_setting, bez "glumljenja" promjena |

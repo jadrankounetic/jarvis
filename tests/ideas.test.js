@@ -61,7 +61,7 @@ const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
 
   console.log('--- 5. Postavke ---');
   click($('settingsBtn')); await sleep(40);
-  pass($('versionLabel').textContent === 'Verzija 8.5', 'Broj verzije prikazan u postavkama');
+  pass($('versionLabel').textContent === 'Verzija 8.6', 'Broj verzije prikazan u postavkama');
   pass(d.querySelectorAll('#ideasList .reminder-item').length === 2, 'Obje ideje na popisu');
   click($('copyIdeasBtn')); await sleep(40);
   pass(clip && clip.startsWith('Ideje za nadogradnju Jarvisa (2):') && clip.includes('1. [') && clip.includes('Napravi tamni način'), 'Kopiraj sve: popis spreman za lijepljenje');
