@@ -54,6 +54,33 @@ const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
   await say('pročitaj moje ideje');
   pass(lastSpeak().startsWith('SPEAK Imaš 2 ideje.') && lastSpeak().includes('1. Dodaj kontrolu rasvjete') && lastSpeak().includes('2. Napravi tamni način'), 'Izgovara broj (ispravna gramatika: "2 ideje") i sve ideje');
 
+  const ideaCards = () => [...d.querySelectorAll('.card-ideas')];
+  const cardRows = c => [...c.querySelectorAll('.idea-row')];
+  pass(ideaCards().length === 1 && cardRows(ideaCards()[0]).length === 2, '"pročitaj moje ideje" — uz čitanje prikazuje i karticu');
+
+  console.log('--- 3b. Kartica s idejama ("pokaži moje ideje") ---');
+  await say('Jarvis, pokaži moje ideje');
+  let card = ideaCards()[0];
+  pass(ideaCards().length === 1, 'Samo jedna kartica (stara se zamijeni novom na dnu)');
+  pass(card.querySelector('.card-header').textContent.includes('IDEJE · 2') && cardRows(card).length === 2, 'Kartica: naslov s brojem i obje ideje');
+  pass(cardRows(card)[0].textContent.includes('1.') && cardRows(card)[0].textContent.includes('Dodaj kontrolu rasvjete') && /\d\d\.\d\d\.\d{4}\./.test(cardRows(card)[0].textContent), 'Ideje su numerirane i imaju datum');
+  pass(lastSpeak() === 'SPEAK Imaš 2 ideje, evo ih na ekranu.', 'Jarvis kratko kaže koliko ih ima (ne čita sve)');
+  pass(geminiCalls === 0, 'Bez AI modela');
+  await say('nova ideja: glasovno upravljanje klimom');
+  card = ideaCards()[0];
+  pass(cardRows(card).length === 3 && card.querySelector('.card-header').textContent.includes('IDEJE · 3'), 'Nova ideja se odmah pojavi na otvorenoj kartici');
+  const newId = ideas()[2].id;
+  click(card.querySelector(`.idea-del[data-id="${newId}"]`)); await waitFor(() => $('pwModal').dataset.open === 'true', 'pw card');
+  $('pwInput').value = '1234'; click($('pwConfirm')); await sleep(60);
+  pass(ideas().length === 2 && cardRows(ideaCards()[0]).length === 2, '× na kartici uz lozinku 1234 briše samo tu ideju');
+  clip = null;
+  click([...ideaCards()[0].querySelectorAll('.util-actions button')].find(b => b.textContent === 'Kopiraj sve')); await sleep(40);
+  pass(clip && clip.startsWith('Ideje za nadogradnju Jarvisa (2):'), '"Kopiraj sve" na kartici');
+  click([...ideaCards()[0].querySelectorAll('.util-actions button')].find(b => b.textContent === 'Zatvori')); await sleep(20);
+  pass(ideaCards().length === 0 && ideas().length === 2, '"Zatvori" makne karticu, ideje ostaju');
+  await say('otvori bilježnicu');
+  pass(ideaCards().length === 1 && cardRows(ideaCards()[0]).length === 2, '"otvori bilježnicu" također otvara karticu');
+
   console.log('--- 4. "Jarvis," ispred drugih naredbi ---');
   events.length = 0;
   await say('Jarvis, nazovi Martinu');
@@ -61,7 +88,7 @@ const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
 
   console.log('--- 5. Postavke ---');
   click($('settingsBtn')); await sleep(40);
-  pass($('versionLabel').textContent === 'Verzija 8.9', 'Broj verzije prikazan u postavkama');
+  pass($('versionLabel').textContent === 'Verzija 9.0', 'Broj verzije prikazan u postavkama');
   pass(d.querySelectorAll('#ideasList .reminder-item').length === 2, 'Obje ideje na popisu');
   click($('copyIdeasBtn')); await sleep(40);
   pass(clip && clip.startsWith('Ideje za nadogradnju Jarvisa (2):') && clip.includes('1. [') && clip.includes('Napravi tamni način'), 'Kopiraj sve: popis spreman za lijepljenje');

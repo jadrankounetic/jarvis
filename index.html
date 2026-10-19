@@ -577,6 +577,22 @@
   .util-table td { padding: 4px; text-align: right; border-top: 1px solid var(--border); color: var(--text); white-space: nowrap; }
   .util-table td.util-uk { color: var(--gold); font-weight: 600; }
   .util-bar { height: 3px; background: var(--gold); opacity: 0.6; margin-top: 2px; }
+  /* Route card */
+  .card-route .route-map { width: calc(100% + 24px); height: 230px; margin: -8px -12px 4px; border: 0; border-bottom: 1px solid var(--border); display: block; }
+  .card-route .util-row .util-l { flex: 0 0 auto; white-space: nowrap; }
+  .card-route .util-row .util-v { min-width: 0; overflow-wrap: anywhere; }
+  .route-note { color: var(--text-dim); font-size: 10px; line-height: 1.5; margin-top: 2px; }
+  /* Ideas card */
+  .idea-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--border); }
+  .idea-row:first-child { border-top: 0; padding-top: 2px; }
+  .idea-n { color: var(--gold); min-width: 20px; font-variant-numeric: tabular-nums; }
+  .idea-t { flex: 1; color: var(--text); line-height: 1.45; }
+  .idea-d { color: var(--text-dim); font-size: 10px; margin-top: 2px; }
+  .idea-del {
+    background: transparent; border: 1px solid var(--red); color: var(--red);
+    width: 18px; height: 18px; border-radius: 3px; cursor: pointer;
+    flex-shrink: 0; font-size: 11px; line-height: 1; padding: 0; margin-top: 1px;
+  }
   .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
   /* Režije panel */
@@ -1290,7 +1306,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '8.9';
+  const JARVIS_VERSION = '9.0';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1312,7 +1328,7 @@ Language:
 - Croatian/Bosnian/Serbian: write naturally as a native speaker would.
 
 Tools available:
-- show_map — place, location, address, or directions requests
+- show_map — show a place, location or address on a map (for directions use plan_route)
 - show_youtube — video, music, or clip requests
 - show_link — directing the user to a specific webpage
 - set_reminder — the user wants to be reminded of something later, either after a delay ("in 20 minutes") or at a specific time ("tomorrow at 3pm"). Resolve the relative time yourself using the current date/time given below, then call with an exact ISO 8601 datetime.
@@ -1336,10 +1352,14 @@ Tools available:
 - save_contact — the user wants to save someone's phone number as a contact. It is not saved until the user confirms.
 - make_phone_call — the user asks you to call someone (nazovi, pozovi). It only opens the dialer with the number filled in; the user presses call. Never claim the call has started.
 - open_utilities_app — the user wants to see or open režije (table, entry form, charts, prices) on screen.
+- plan_route — directions, a route, "how do I get to", "how far is it to", navigation. The start is the user's current GPS location unless the user explicitly names a start ("od X do Y"); then pass that start as origin. Stops the user wants on the way (nearest petrol station, shop, pharmacy, a named place) go in stops. Use place names in nominative case.
+- add_route_stop — add a stop to the route already on screen ("dodaj usput najbližu benzinsku").
+- start_navigation — start turn-by-turn navigation in Google Maps for the route on screen.
+- show_ideas — show the ideas notebook (saved upgrade ideas) on screen.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
 You cannot change your own code, layout, fonts or features. The ONLY things about yourself you can change are the options of change_setting. If the user asks for any other change to you or your interface, say plainly that you cannot do that yourself and ask whether to save it as an idea for a future upgrade (in Croatian: "Želiš li da to zapišem kao novu ideju?"); if they agree, call save_idea. Never claim a change that a tool did not confirm.
 
-For display tools (show_map/show_youtube/show_link): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
+For display tools (show_map/show_youtube/show_link/show_ideas/start_navigation): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
 For all other tools: call directly, then briefly summarize the result in speech.`;
 
   const PERSONALITY_LINES = [
@@ -1394,7 +1414,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   const TOOLS = [
     {
       name: 'show_map',
-      description: 'Display a Google Maps view embedded in the conversation. Use for any place, location, address, or directions request.',
+      description: 'Display a Google Maps view of a place or address embedded in the conversation. For directions or a route use plan_route instead.',
       input_schema: {
         type: 'object',
         properties: {
@@ -1673,6 +1693,39 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           tab: { type: 'string', enum: ['tablica', 'unos', 'grafovi', 'cijene'], description: 'Which screen to show: table, entry form, charts or prices.' }
         }
       }
+    },
+    {
+      name: 'plan_route',
+      description: 'Plan a route and show it on a card with a map, distance, travel time and a button that starts Google Maps navigation. The start is the user\'s current GPS location unless the user explicitly names a different start. Stops such as "najbliža benzinska" are searched for close to the route.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          destination: { type: 'string', description: 'Where the user wants to go, nominative case with the town if known (e.g. "Riva, Split"). May also be a kind of place, e.g. "najbliža ljekarna".' },
+          origin: { type: 'string', description: 'Only if the user explicitly named a start (e.g. "od Kaštela do Trogira" → "Kaštela"). Omit to start from the current location.' },
+          stops: { type: 'array', items: { type: 'string' }, description: 'Optional stops on the way, in order, e.g. ["najbliža benzinska", "najbliži dućan", "Kaštel Sućurac"].' },
+          travel_mode: { type: 'string', enum: ['driving', 'walking', 'bicycling', 'transit'], description: 'Default driving.' }
+        },
+        required: ['destination']
+      }
+    },
+    {
+      name: 'add_route_stop',
+      description: 'Add a stop to the route currently on screen, e.g. "najbliža benzinska", "najbliži Lidl", or a named place. The best match close to the route is chosen.',
+      input_schema: {
+        type: 'object',
+        properties: { stop: { type: 'string', description: 'The stop, e.g. "najbliža benzinska" or "Kaštel Sućurac".' } },
+        required: ['stop']
+      }
+    },
+    {
+      name: 'start_navigation',
+      description: 'Open Google Maps turn-by-turn navigation for the route currently on screen.',
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'show_ideas',
+      description: 'Show the ideas notebook (saved ideas for Jarvis upgrades) as a card on screen.',
+      input_schema: { type: 'object', properties: {} }
     }
   ];
 
@@ -4522,6 +4575,48 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     el.querySelectorAll('.reminder-delete').forEach(btn => btn.addEventListener('click', async () => {
       if (await requirePassword('Obrisati ovu ideju?')) removeIdea(btn.dataset.id);
     }));
+    refreshIdeasCard();
+  }
+  // The ideas notebook as a card in the conversation ("pokaži moje ideje").
+  // It follows every change: a new idea, a deleted one, "Obriši sve".
+  let ideasCard = null;
+  function renderIdeasCard(existing) {
+    const list = loadIdeas();
+    const body = list.length
+      ? list.map((i, n) => `<div class="idea-row"><span class="idea-n">${n + 1}.</span><div class="idea-t">${escapeHtml(i.text)}<div class="idea-d">${ideaDate(i.timestamp)}</div></div>`
+          + `<button type="button" class="idea-del" data-id="${i.id}" aria-label="Obriši ideju">×</button></div>`).join('')
+      : '<div class="util-done">Bilježnica je prazna. Reci "Jarvis, nova ideja: …".</div>';
+    const card = utilCard(existing, `IDEJE · ${list.length}`, body, [
+      { label: 'Kopiraj sve', disabled: !list.length, onClick: async (e) => {
+        const btn = e.currentTarget;
+        try { await navigator.clipboard.writeText(ideasAsText()); btn.textContent = 'Kopirano ✓'; }
+        catch (err) { btn.textContent = 'Kopiranje nije uspjelo'; }
+        setTimeout(() => { if (btn.isConnected) btn.textContent = 'Kopiraj sve'; }, 2500);
+      } },
+      { label: 'Zatvori', onClick: () => { card.remove(); if (ideasCard === card) ideasCard = null; } },
+    ], '💡');
+    card.classList.add('card-ideas');
+    card.querySelectorAll('.idea-del').forEach(btn => btn.addEventListener('click', async () => {
+      if (await requirePassword('Obrisati ovu ideju?')) removeIdea(btn.dataset.id);
+    }));
+    ideasCard = card;
+    return card;
+  }
+  function refreshIdeasCard() { if (ideasCard && ideasCard.isConnected) renderIdeasCard(ideasCard); }
+  function showIdeasCard() {
+    if (ideasCard && ideasCard.isConnected) ideasCard.remove(); // show it fresh at the bottom
+    return renderIdeasCard(null);
+  }
+  function isShowIdeasIntent(text) {
+    const x = text.trim().replace(/[.!?]+$/, '');
+    return /^(pokaži|pokazi|prikaži|prikazi|otvori|daj)\s+(mi\s+)?(moje\s+|sve\s+|moju\s+|sve\s+moje\s+)?(ideje|bilježnic\w*|biljeznic\w*)(\s+ideja)?(\s+na\s+(ekranu|zaslonu))?$/i.test(x)
+      || /^(moje\s+ideje|show\s+(me\s+)?my\s+ideas|open\s+(my\s+)?ideas)$/i.test(x);
+  }
+  async function voiceShowIdeas(userText, lang) {
+    const n = loadIdeas().length;
+    addMessage('user', userText);
+    showIdeasCard();
+    await localReply(userText, n ? `Imaš ${n} ${ideasWord(n)}, ${n === 1 ? 'evo je' : 'evo ih'} na ekranu.` : 'Bilježnica je prazna. Reci: Jarvis, nova ideja, pa izgovori ideju.', lang, true);
   }
   function ideasWord(n) { // 1 ideju, 2–4 ideje, 5+ ideja (11–14 uvijek "ideja")
     const d = n % 10, h = n % 100;
@@ -4556,7 +4651,593 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const list = loadIdeas();
     const msg = !list.length ? 'Nemaš spremljenih ideja.'
       : `Imaš ${list.length} ${ideasWord(list.length)}. ` + list.map((i, n) => `${n + 1}. ${i.text}.`).join(' ');
-    await localReply(userText, msg, lang);
+    addMessage('user', userText);
+    showIdeasCard();
+    await localReply(userText, msg, lang, true);
+  }
+
+  // ---------- Routes & navigation ----------
+  // The start is the phone's current location unless the user names one
+  // ("od X do Y"). Stops ("usput najbližu benzinsku") are looked up on
+  // OpenStreetMap close to the planned route; the drive itself runs in
+  // Google Maps, which adds live traffic. All services are free and need
+  // no key: Photon/Nominatim (place names), FOSSGIS OSRM (distance and
+  // time), Overpass (petrol stations, shops…).
+  const ROUTE_TTL_MS = 3 * 3600000;       // "dodaj usput…" works for 3 h after planning
+  const ROUTE_IMPLICIT_MS = 45 * 60000;   // a bare "najbliža benzinska" joins the route only if it is fresh
+  const ROUTE_MAX_STOPS = 5;
+  const ROUTE_MODES = {
+    driving:   { osrm: 'routed-car',  label: 'autom',             verb: 'vožnja traje', dirflg: '' },
+    walking:   { osrm: 'routed-foot', label: 'pješice',           verb: 'hod traje', dirflg: 'w' },
+    bicycling: { osrm: 'routed-bike', label: 'biciklom',          verb: 'vožnja biciklom traje', dirflg: 'b' },
+    transit:   { osrm: null,          label: 'javnim prijevozom', verb: '', dirflg: 'r' },
+  };
+  // nearest = how Jarvis says "the nearest …", acc = "I didn't find a …"
+  const POI_KINDS = [
+    { key: 'fuel', re: /benzinsk|pump[aeiu]\b|crpk|goriv|natoč|natoc|tankati|petrol|gas station|fuel/, osm: ['["amenity"="fuel"]'], label: 'Benzinska', icon: '⛽', nearest: 'Najbliža benzinska', acc: 'benzinsku' },
+    { key: 'charging', re: /punionic|punjač|punjac|punjenj|charging/, osm: ['["amenity"="charging_station"]'], label: 'Punionica', icon: '🔌', nearest: 'Najbliža punionica', acc: 'punionicu' },
+    { key: 'pharmacy', re: /ljekarn|apotek|pharmac/, osm: ['["amenity"="pharmacy"]'], label: 'Ljekarna', icon: '💊', nearest: 'Najbliža ljekarna', acc: 'ljekarnu' },
+    { key: 'bakery', re: /pekar|bakery/, osm: ['["shop"="bakery"]'], label: 'Pekara', icon: '🥐', nearest: 'Najbliža pekara', acc: 'pekaru' },
+    { key: 'shop', re: /dućan|ducan|trgovin|samoposlug|market|supermarket|grocery|shop\b/, osm: ['["shop"~"^(supermarket|convenience)$"]'], label: 'Dućan', icon: '🛒', nearest: 'Najbliži dućan', acc: 'dućan' },
+    { key: 'atm', re: /bankomat|\batm\b/, osm: ['["amenity"="atm"]'], label: 'Bankomat', icon: '🏧', nearest: 'Najbliži bankomat', acc: 'bankomat' },
+    { key: 'cafe', re: /kafić|kafic|kafana|kavan|\bkav[aeu]\b|\bcaf[eé]\b|coffee/, osm: ['["amenity"="cafe"]'], label: 'Kafić', icon: '☕', nearest: 'Najbliži kafić', acc: 'kafić' },
+    { key: 'food', re: /restoran|ručak|rucak|večer[au]|vecer[au]|nešto za jesti|nesto za jesti|hrana|restaurant|food/, osm: ['["amenity"~"^(restaurant|fast_food)$"]'], label: 'Restoran', icon: '🍽', nearest: 'Najbliži restoran', acc: 'restoran' },
+    { key: 'parking', re: /parking|parkiralište|parkiraliste|garaž|garaz/, osm: ['["amenity"="parking"]'], label: 'Parking', icon: '🅿', nearest: 'Najbliži parking', acc: 'parking' },
+    { key: 'post', re: /\bpošt[aeiu]\b|\bpost[aeiu]\b|post office/, osm: ['["amenity"="post_office"]'], label: 'Pošta', icon: '✉', nearest: 'Najbliža pošta', acc: 'poštu' },
+    { key: 'carwash', re: /praonic|car wash/, osm: ['["amenity"="car_wash"]'], label: 'Autopraonica', icon: '🚿', nearest: 'Najbliža autopraonica', acc: 'autopraonicu' },
+    { key: 'hospital', re: /bolnic|hitn[aeuo]|hospital/, osm: ['["amenity"="hospital"]'], label: 'Bolnica', icon: '🏥', nearest: 'Najbliža bolnica', acc: 'bolnicu' },
+  ];
+  const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+  const HERE_RE = /^(mene|sebe|ovdje|ovuda|odavde|tu|moje\s+(trenutne\s+)?lokacije|trenutne\s+lokacije|moje\s+pozicije|mjesta\s+gdje\s+sam(\s+sada?)?|ovog\s+mjesta|here|my\s+(current\s+)?location|current\s+location|trenutna\s+lokacija|moja\s+lokacija)$/i;
+  let activeRoute = null; // { origin, dest, stops, mode, stats, line, at, card, hereError }
+  let lastHere = null;    // { lat, lng, acc, at }
+  let routeHintGiven = false;
+
+  function routeIsActive(maxAge) { return !!activeRoute && Date.now() - activeRoute.at < (maxAge || ROUTE_TTL_MS); }
+  function routeCap(s) { s = String(s || '').trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function routeNorm(s) { return String(s || '').toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+  async function fetchJsonTimeout(url, opts, ms) {
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => ac && ac.abort(), ms || 10000);
+    try {
+      const r = await fetch(url, Object.assign({}, opts || {}, ac ? { signal: ac.signal } : {}));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(timer); }
+  }
+
+  // Current GPS position. Chrome asks once whether this page may use the location.
+  function getHere() {
+    if (lastHere && Date.now() - lastHere.at < 120000) return Promise.resolve(lastHere);
+    return new Promise(resolve => {
+      const geo = navigator.geolocation;
+      if (!geo) { resolve({ error: 'Ovaj preglednik ne daje lokaciju.' }); return; }
+      let done = false, timer = null;
+      const finish = v => { if (done) return; done = true; clearTimeout(timer); if (!v.error) lastHere = v; resolve(v); };
+      timer = setTimeout(() => finish({ error: 'Lokacija se nije javila na vrijeme — provjeri je li lokacija na mobitelu uključena.' }), 16000);
+      try {
+        geo.getCurrentPosition(
+          p => finish({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, at: Date.now() }),
+          e => finish({ error: e && e.code === 1
+            ? 'Pristup lokaciji je odbijen. U Chromeu dodirni ikonu lijevo od adrese → Dopuštenja → Lokacija → Dopusti.'
+            : 'Lokaciju trenutno nije moguće odrediti — uključi lokaciju na mobitelu.' }),
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+      } catch (e) { finish({ error: 'Lokaciju nije moguće odrediti.' }); }
+    });
+  }
+
+  // ---------- Geometry ----------
+  function geoDist(a, b) { // metres
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  // How far p is from the route line (off) and how far along the route its closest point lies (along).
+  function projectOnLine(p, line) {
+    if (!line || !line.length) return { off: Infinity, along: 0 };
+    if (line.length === 1) return { off: geoDist(p, line[0]), along: 0 };
+    const kx = 111320 * Math.cos(p.lat * Math.PI / 180), ky = 110540;
+    let best = { off: Infinity, along: 0 }, acc = 0;
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = line[i], b = line[i + 1];
+      const ax = (a.lng - p.lng) * kx, ay = (a.lat - p.lat) * ky, dx = (b.lng - a.lng) * kx, dy = (b.lat - a.lat) * ky;
+      const len2 = dx * dx + dy * dy, seg = Math.sqrt(len2);
+      const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+      const cx = ax + t * dx, cy = ay + t * dy, off = Math.sqrt(cx * cx + cy * cy);
+      if (off < best.off) best = { off, along: acc + t * seg };
+      acc += seg;
+    }
+    return best;
+  }
+  function lineLength(line) { let s = 0; for (let i = 1; i < line.length; i++) s += geoDist(line[i - 1], line[i]); return s; }
+  function linePrefix(line, maxM) {
+    const out = [line[0]]; let s = 0;
+    for (let i = 1; i < line.length && s < maxM; i++) { s += geoDist(line[i - 1], line[i]); out.push(line[i]); }
+    return out;
+  }
+  function thinLine(line, maxPts) {
+    if (line.length <= maxPts) return line;
+    const step = (line.length - 1) / (maxPts - 1), out = [];
+    for (let i = 0; i < maxPts; i++) out.push(line[Math.round(i * step)]);
+    return out;
+  }
+
+  // ---------- Spoken / short numbers (Croatian grammar) ----------
+  function distSpoken(m) {
+    if (m < 950) { const r = Math.max(50, Math.round(m / 50) * 50); return `${r} ${plural(r, 'metar', 'metra', 'metara')}`; }
+    if (m < 9950) {
+      const k = Math.round(m / 100) / 10;
+      return Number.isInteger(k) ? `${k} ${plural(k, 'kilometar', 'kilometra', 'kilometara')}` : `${String(k).replace('.', ',')} kilometra`;
+    }
+    const k = Math.round(m / 1000); return `${k} ${plural(k, 'kilometar', 'kilometra', 'kilometara')}`;
+  }
+  function durSpoken(s) { // accusative: "traje 21 minutu"
+    const min = Math.max(1, Math.round(s / 60));
+    if (min < 60) return `${min} ${plural(min, 'minutu', 'minute', 'minuta')}`;
+    const h = Math.floor(min / 60), r = min % 60;
+    return `${h} ${plural(h, 'sat', 'sata', 'sati')}` + (r ? ` i ${r} ${plural(r, 'minutu', 'minute', 'minuta')}` : '');
+  }
+  function distShort(m) { return m < 950 ? `${Math.max(50, Math.round(m / 50) * 50)} m` : `${(m / 1000).toFixed(m < 99500 ? 1 : 0).replace('.', ',')} km`; }
+  function durShort(s) { const min = Math.max(1, Math.round(s / 60)); return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h` + (min % 60 ? ` ${min % 60} min` : ''); }
+
+  // ---------- Place names → coordinates ----------
+  // Spoken Croatian puts names in other cases ("do Trogira", "od Kaštela", "u Splitu"),
+  // so a few nominative guesses are tried as well.
+  function placeVariants(text) {
+    const t = String(text || '').trim(), out = [t];
+    const m = /^(.*?)(\p{L}+)$/u.exec(t);
+    if (m) {
+      const pre = m[1], w = m[2], lw = w.toLowerCase();
+      const add = s => { const v = pre + s; if (v.length > 1 && !out.includes(v)) out.push(v); };
+      if (/e$/.test(lw)) add(w.slice(0, -1) + 'a');                   // Rijeke → Rijeka
+      if (/a$/.test(lw)) { add(w.slice(0, -1)); add(w.slice(0, -1) + 'e'); } // Trogira → Trogir, Toplica → Toplice
+      if (/u$/.test(lw)) { add(w.slice(0, -1)); add(w.slice(0, -1) + 'a'); } // Splitu → Split, Rivu → Riva
+      if (/i$/.test(lw)) add(w.slice(0, -1) + 'a');                   // Dubravi → Dubrava
+    }
+    return out.slice(0, 4);
+  }
+  function photonLabel(p) {
+    const parts = [p.name || [p.street, p.housenumber].filter(Boolean).join(' '), p.district || p.city || p.county || p.state];
+    if (p.city && p.district && p.city !== p.district) parts.push(p.city);
+    return [...new Set(parts.filter(Boolean))].join(', ');
+  }
+  async function geocodePlace(text, near) {
+    const variants = placeVariants(text), wanted = variants.map(routeNorm);
+    let fallback = null, reached = false;
+    for (const v of variants.slice(0, 3)) {
+      try {
+        const j = await fetchJsonTimeout(`https://photon.komoot.io/api/?q=${encodeURIComponent(v)}&limit=6`
+          + (near ? `&lat=${near.lat.toFixed(5)}&lon=${near.lng.toFixed(5)}` : ''), {}, 8000);
+        reached = true;
+        const feats = (j.features || []).filter(f => f.geometry && Array.isArray(f.geometry.coordinates));
+        if (!feats.length) continue;
+        const score = f => (wanted.includes(routeNorm(f.properties.name)) ? 4 : 0) + (f.properties.osm_key === 'place' ? 1 : 0);
+        const best = feats.slice().sort((a, b) => score(b) - score(a))[0];
+        const hit = { lat: best.geometry.coordinates[1], lng: best.geometry.coordinates[0], label: photonLabel(best.properties) || routeCap(v) };
+        if (score(best) >= 4) return hit;
+        if (!fallback) fallback = hit;
+      } catch (e) { /* try the next variant / service */ }
+    }
+    if (fallback) return fallback;
+    if (!reached) { // Photon unreachable — one try on Nominatim
+      try {
+        const j = await fetchJsonTimeout(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=hr&q=${encodeURIComponent(variants[0])}`, {}, 8000);
+        if (j && j[0]) return { lat: Number(j[0].lat), lng: Number(j[0].lon), label: String(j[0].display_name || variants[0]).split(',').slice(0, 2).map(s => s.trim()).join(', ') };
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  // ---------- Distance & time ----------
+  async function osrmRoute(points, mode) {
+    const prof = (ROUTE_MODES[mode] || {}).osrm;
+    if (!prof || points.some(p => p.lat == null)) return null;
+    const coords = points.map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
+    const j = await fetchJsonTimeout(`https://routing.openstreetmap.de/${prof}/route/v1/driving/${coords}?overview=full&geometries=geojson`, {}, 12000);
+    if (!j || j.code !== 'Ok' || !j.routes || !j.routes.length) return null;
+    const r = j.routes[0];
+    return { dist: r.distance, dur: r.duration, line: ((r.geometry && r.geometry.coordinates) || []).map(c => ({ lat: c[1], lng: c[0] })) };
+  }
+  async function routeRecalc(route) {
+    route.stats = null; route.line = null;
+    try {
+      const r = await osrmRoute([route.origin, ...route.stops, route.dest], route.mode);
+      if (r) { route.stats = { dist: r.dist, dur: r.dur }; route.line = r.line.length > 1 ? r.line : null; }
+    } catch (e) { /* the map and Google Maps still work without the estimate */ }
+    if (route.line) route.stops.forEach(s => { if (s.lat != null) s.along = projectOnLine(s, route.line).along; });
+  }
+
+  // ---------- Places along the way (OpenStreetMap / Overpass) ----------
+  function poiKind(text) { const x = String(text || '').toLowerCase(); return POI_KINDS.find(k => k.re.test(x)) || null; }
+  function cleanStopText(text) {
+    return String(text || '').trim().replace(/[.!?]+$/, '')
+      .replace(/^(?:i\s+)?(?:mi\s+|nam\s+)?(?:još\s+|jos\s+)?(?:jedn[aeu]\s+|jedan\s+|nek[aeiu]\s+|neki\s+|prv[aeiu]\s+|prvi\s+)?(?:(?:novo\s+)?stajališt\w*\s+|stajalist\w*\s+|stanic\w*\s+)?(?:na\s+|u\s+|kod\s+|do\s+)?/i, '')
+      .trim();
+  }
+  function isNearestPhrase(text) { return /najbli[žz]|nearest|closest|\bprv[aeiu]\b|\bnek[aeiu]\b|\bneki\b/i.test(text); }
+  function stopSpec(text) {
+    const kind = poiKind(text);
+    if (kind) return { kind, filters: kind.osm, icon: kind.icon, nearest: kind.nearest, acc: kind.acc };
+    // "najbliži Lidl", "najbliža INA" — a shop or brand by name
+    const name = String(text || '').replace(/najbli[žz]\w*|nearest|closest|\bprv[aeiu]\b|\bnek[aeiu]\b|\bneki\b/gi, '').replace(/[^\p{L}\p{N} '&-]/gu, '').trim();
+    if (!name) return null;
+    const v = placeVariants(name).map(s => s.replace(/"/g, '')).join('|');
+    return { kind: null, name: routeCap(name), filters: [`["name"~"^(${v})",i]`, `["brand"~"^(${v})",i]`], icon: '📍', nearest: 'Najbliže', acc: `"${routeCap(name)}"` };
+  }
+  async function overpassFind(filters, area, limit) {
+    const q = `[out:json][timeout:20];(${filters.map(f => `nwr${f}${area};`).join('')});out center tags ${limit || 100};`;
+    let lastErr = null;
+    for (const url of OVERPASS_URLS) {
+      try {
+        const j = await fetchJsonTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) }, 22000);
+        return (j.elements || []).map(el => {
+          const lat = el.lat != null ? el.lat : el.center && el.center.lat, lng = el.lon != null ? el.lon : el.center && el.center.lon;
+          const tg = el.tags || {};
+          const addr = [[tg['addr:street'], tg['addr:housenumber']].filter(Boolean).join(' '), tg['addr:city']].filter(Boolean).join(', ');
+          return { id: `${el.type}${el.id}`, lat, lng, name: tg.name || tg.brand || tg.operator || '', addr };
+        }).filter(p => p.lat != null && p.lng != null);
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('Overpass');
+  }
+  async function findNearest(spec, center, excludeIds) {
+    for (const r of [2000, 6000, 15000]) {
+      const found = (await overpassFind(spec.filters, `(around:${r},${center.lat.toFixed(5)},${center.lng.toFixed(5)})`, 100))
+        .filter(p => !(excludeIds || []).includes(p.id));
+      if (found.length) {
+        found.forEach(p => { p.dist = geoDist(center, p); });
+        found.sort((a, b) => a.dist - b.dist);
+        return found[0];
+      }
+    }
+    return null;
+  }
+  // First suitable place on the way: little detour, as early on the route as possible.
+  async function findStopNearRoute(spec, route) {
+    const exclude = route.stops.map(s => s.id).filter(Boolean);
+    if (route.line) {
+      const total = lineLength(route.line);
+      const parts = total > 20000 ? [linePrefix(route.line, 15000), route.line] : [route.line];
+      for (const part of parts) {
+        const pts = thinLine(part, 70).map(p => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(',');
+        const found = (await overpassFind(spec.filters, `(around:1500,${pts})`, 150)).filter(p => !exclude.includes(p.id));
+        let best = null;
+        for (const p of found) {
+          const pr = projectOnLine(p, route.line);
+          if (pr.off > 1500) continue;
+          const score = pr.along + 3 * pr.off;
+          if (!best || score < best.score) best = Object.assign({}, p, { off: pr.off, along: pr.along, score });
+        }
+        if (best) return best;
+      }
+      return null;
+    }
+    const center = route.origin.lat != null ? route.origin : route.dest.lat != null ? route.dest : null;
+    if (!center) return null;
+    const p = await findNearest(spec, center, exclude);
+    return p ? Object.assign(p, { off: null }) : null;
+  }
+  function poiSpoken(p) { return [p.name || p.label, p.addr && p.addr.split(',')[0]].filter(Boolean).join(', '); }
+  function routeStatsSpoken(route, now) {
+    if (!route.stats) return '';
+    const m = ROUTE_MODES[route.mode];
+    return ` Ruta je ${now ? 'sada ' : ''}${distSpoken(route.stats.dist)}${m.verb ? `, ${m.verb} otprilike ${durSpoken(route.stats.dur)}` : ''}.`;
+  }
+
+  async function addStopToRoute(route, rawText) {
+    const near = isNearestPhrase(rawText);
+    const text = cleanStopText(rawText);
+    if (!text) return { error: 'Nisam razumio koje stajalište da dodam.' };
+    if (route.stops.length >= ROUTE_MAX_STOPS) return { error: `Ruta već ima ${ROUTE_MAX_STOPS} stajališta, više od toga Google Karte ne primaju pouzdano.` };
+    const kind = poiKind(text);
+    let stop = null;
+    if (kind || near) {
+      const spec = stopSpec(text);
+      if (!spec) return { error: 'Nisam razumio koje stajalište da dodam.' };
+      let p;
+      try { p = await findStopNearRoute(spec, route); }
+      catch (e) { return { error: 'Pretraga mjesta na karti trenutno ne radi, pokušaj za minutu.' }; }
+      if (!p) return { error: `Blizu rute nisam našao ${spec.acc}.` };
+      stop = Object.assign(p, { poi: true, icon: spec.icon, kind: kind ? kind.key : null, label: p.name || (kind ? kind.label : spec.name) });
+    } else {
+      const g = await geocodePlace(text, route.origin.lat != null ? route.origin : lastHere);
+      if (!g) return { error: `Ne mogu pronaći mjesto "${routeCap(text)}".` };
+      stop = Object.assign(g, { query: text, icon: '📍' });
+      if (route.line) stop.off = projectOnLine(stop, route.line).off;
+    }
+    stop.along = route.line ? projectOnLine(stop, route.line).along : Infinity;
+    route.stops.push(stop);
+    route.stops.sort((a, b) => (a.along ?? Infinity) - (b.along ?? Infinity));
+    route.at = Date.now();
+    await routeRecalc(route);
+    const where = stop.poi && stop.off != null ? (stop.off < 100 ? ', na samoj ruti' : `, ${distSpoken(stop.off)} od rute`) : '';
+    return { stop, spoken: `Dodao sam usput ${poiSpoken(stop)}${where}.` + routeStatsSpoken(route, true) };
+  }
+
+  // ---------- Google Maps ----------
+  function routePoint(p) { return p.lat != null ? `${p.lat.toFixed(6)},${p.lng.toFixed(6)}` : (p.query || p.label); }
+  function routeNavUrl(route) {
+    const qs = new URLSearchParams({ api: '1' });
+    if (!route.origin.here) qs.set('origin', routePoint(route.origin)); // no origin = Google uses the live position
+    qs.set('destination', routePoint(route.dest));
+    if (route.stops.length) qs.set('waypoints', route.stops.map(routePoint).join('|'));
+    qs.set('travelmode', route.mode);
+    qs.set('dir_action', 'navigate');
+    const web = 'https://www.google.com/maps/dir/?' + qs.toString();
+    if (!isAndroid()) return web;
+    return `intent://www.google.com/maps/dir/?${qs.toString()}#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+  }
+  function routeEmbedUrl(route) {
+    const flg = ROUTE_MODES[route.mode].dirflg;
+    if (route.origin.lat == null && route.origin.here) return `https://maps.google.com/maps?q=${encodeURIComponent(routePoint(route.dest))}&output=embed`;
+    const to = [...route.stops, route.dest].map(p => encodeURIComponent(routePoint(p))).join('+to:');
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(routePoint(route.origin))}&daddr=${to}${flg ? '&dirflg=' + flg : ''}&output=embed`;
+  }
+  function startNavigation(route) { openExternal(routeNavUrl(route)); }
+
+  // ---------- Card ----------
+  function routePlaceText(p) {
+    if (p.here) return p.lat != null ? `📍 Tvoja lokacija${p.acc ? ` (±${Math.round(p.acc)} m)` : ''}` : '📍 Tvoja lokacija (odredit će Google Karte)';
+    return [p.label, p.poi && p.addr ? p.addr : ''].filter(Boolean).join(', ');
+  }
+  function renderRouteCard(route, statusHtml) {
+    if (statusHtml) {
+      route.card = utilCard(route.card, 'RUTA', `<div class="util-done">${statusHtml}</div>`, [], '⌖');
+      route.card.classList.add('card-route');
+      return route.card;
+    }
+    let body = `<iframe class="route-map" src="${escapeHtml(routeEmbedUrl(route))}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Karta rute"></iframe>`;
+    body += utilRow('Polazak', routePlaceText(route.origin));
+    route.stops.forEach((s, i) => {
+      const where = s.poi && s.off != null ? (s.off < 100 ? ' · na ruti' : ` · ${distShort(s.off)} od rute`) : '';
+      body += utilRow(`${s.icon} Usput ${i + 1}`, routePlaceText(s) + where);
+    });
+    body += utilRow(route.dest.icon ? `${route.dest.icon} Odredište` : 'Odredište', routePlaceText(route.dest));
+    if (route.stats) body += utilRow(`Ukupno ${ROUTE_MODES[route.mode].label}`, `${distShort(route.stats.dist)} · ${durShort(route.stats.dur)}`, 'util-total');
+    else body += utilRow('Način', ROUTE_MODES[route.mode].label);
+    const notes = [];
+    if (route.hereError) notes.push(route.hereError);
+    if (route.stats) notes.push('Vrijeme je procjena bez gužvi — Google Karte u navigaciji računaju promet uživo.');
+    notes.push('Glasom: "dodaj usput najbližu benzinsku", "makni zadnje stajalište", "pokreni navigaciju".');
+    body += `<div class="route-note">${notes.map(escapeHtml).join('<br>')}</div>`;
+    route.card = utilCard(route.card, 'RUTA', body, [
+      { label: '▶ Navigacija', cls: 'util-save', onClick: () => startNavigation(route) },
+      { label: '⛽ + Benzinska', onClick: () => voiceRouteStop('+ Benzinska', 'najbližu benzinsku', currentLang(), route) },
+      { label: '🛒 + Dućan', onClick: () => voiceRouteStop('+ Dućan', 'najbliži dućan', currentLang(), route) },
+    ], '⌖');
+    route.card.classList.add('card-route');
+    return route.card;
+  }
+
+  // ---------- Planning ----------
+  // req: { from: null | 'here' | place, to: place or "najbliža benzinska", stops: [..], mode }
+  async function planRoute(req, existingCard) {
+    const mode = ROUTE_MODES[req.mode] ? req.mode : 'driving';
+    const fromText = req.from && !HERE_RE.test(String(req.from).trim()) ? String(req.from).trim() : null;
+    const toText = String(req.to || '').trim();
+    if (!toText) return { error: 'Reci mi kamo želiš ići.' };
+    const here = await getHere();
+    const hereOk = !here.error;
+    let origin;
+    if (fromText) {
+      const g = await geocodePlace(fromText, hereOk ? here : null);
+      origin = g ? Object.assign(g, { query: fromText }) : { label: routeCap(fromText), query: fromText };
+    } else {
+      origin = hereOk ? { here: true, label: 'Tvoja lokacija', lat: here.lat, lng: here.lng, acc: here.acc } : { here: true, label: 'Tvoja lokacija' };
+    }
+    const near = origin.lat != null ? origin : (hereOk ? here : null);
+    let dest, lead = '';
+    // "do najbliže benzinske", or just "do benzinske" / "do pošte" (a kind of place, no proper name)
+    if (isNearestPhrase(toText) || (poiKind(toText) && toText.split(/\s+/).length <= 2 && !/\p{Lu}/u.test(toText))) {
+      const spec = stopSpec(cleanStopText(toText));
+      if (!spec) return { error: 'Nisam razumio što tražiš.' };
+      if (origin.lat == null) return { error: `Za traženje najbližeg mjesta trebam tvoju lokaciju. ${here.error || ''}`.trim() };
+      let p;
+      try { p = await findNearest(spec, origin); }
+      catch (e) { return { error: 'Pretraga mjesta na karti trenutno ne radi, pokušaj za minutu.' }; }
+      if (!p) return { error: `U blizini nisam našao ${spec.acc}.` };
+      dest = Object.assign(p, { poi: true, icon: spec.icon, label: p.name || (spec.kind ? spec.kind.label : spec.name) });
+      lead = `${spec.nearest} je ${poiSpoken(dest)}, ${distSpoken(p.dist)} od ${origin.here ? 'tebe' : 'polaska'}.`;
+    } else {
+      const g = await geocodePlace(toText, near);
+      dest = g ? Object.assign(g, { query: toText }) : { label: routeCap(toText), query: toText };
+    }
+    // A new route replaces the previous one; the old card keeps its map but loses its buttons.
+    if (activeRoute && activeRoute.card && activeRoute.card !== existingCard) {
+      const bar = activeRoute.card.querySelector('.util-actions'); if (bar) bar.remove();
+    }
+    const route = { origin, dest, stops: [], mode, stats: null, line: null, at: Date.now(), card: existingCard || null,
+      hereError: !fromText && !hereOk ? here.error : null };
+    await routeRecalc(route);
+    activeRoute = route;
+    const stopMsgs = [];
+    for (const s of (req.stops || []).slice(0, ROUTE_MAX_STOPS)) {
+      const r = await addStopToRoute(route, s);
+      stopMsgs.push(r.error || `Usput: ${poiSpoken(r.stop)}.`);
+    }
+    renderRouteCard(route);
+    let spoken = lead ? lead + ' ' : '';
+    if (!fromText && !hereOk) spoken += 'Nisam mogao odrediti tvoju lokaciju, pa će polazak odrediti Google Karte. ';
+    spoken += route.stats
+      ? `Ruta je spremna: ${distSpoken(route.stats.dist)}${ROUTE_MODES[mode].verb ? `, ${ROUTE_MODES[mode].verb} otprilike ${durSpoken(route.stats.dur)}` : ''}.`
+      : 'Ruta je spremna na karti.';
+    if (stopMsgs.length) spoken += ' ' + stopMsgs.join(' ');
+    if (!routeHintGiven) { spoken += ' Kad kreneš, reci: pokreni navigaciju.'; routeHintGiven = true; }
+    return { route, spoken: spoken.trim(), summary: routeSummaryForModel(route, stopMsgs) };
+  }
+  function routeSummaryForModel(route, extra) {
+    const pt = p => p.here ? (p.lat != null ? 'the user\'s current GPS location' : 'the user\'s current location (GPS unavailable; Google Maps will determine it)') : routePlaceText(p);
+    let s = `Route card shown. From ${pt(route.origin)} to ${pt(route.dest)}`;
+    if (route.stops.length) s += `, stops: ${route.stops.map(x => routePlaceText(x)).join('; ')}`;
+    s += route.stats ? `. Distance ${(route.stats.dist / 1000).toFixed(1)} km, about ${Math.round(route.stats.dur / 60)} min ${route.mode} without traffic.` : '. No distance estimate available.';
+    if (extra && extra.length) s += ' Notes: ' + extra.join(' ');
+    return s + ' Tell the user the distance and time in one short sentence; they can say "pokreni navigaciju" to start Google Maps, or "dodaj usput najbližu benzinsku" to add a stop.';
+  }
+
+  // ---------- Voice flows ----------
+  async function routeBusyRun(userText, lang, work) {
+    addMessage('user', userText);
+    stopWakeWordListening();
+    state.processing = true; setState('thinking'); updateMic();
+    let out;
+    try { out = await work(); }
+    catch (e) { out = { error: 'Rutu nije moguće izračunati: ' + e.message }; }
+    state.processing = false; setState('idle'); updateMic();
+    await localReply(userText, out.error || out.spoken, lang, true);
+    resumeWakeWordIfEnabled();
+  }
+  function voicePlanRoute(userText, req, lang) {
+    if (state.processing) return;
+    const card = utilCard(null, 'RUTA', `<div class="util-done">⏳ ${req.from && !HERE_RE.test(req.from) ? 'Tražim mjesta i računam rutu…' : 'Određujem tvoju lokaciju i računam rutu…'}</div>`, [], '⌖');
+    card.classList.add('card-route');
+    return routeBusyRun(userText, lang, async () => {
+      const out = await planRoute(req, card);
+      if (out.error) utilFinalizeCard(card, 'RUTA', out.error);
+      return out;
+    });
+  }
+  function voiceRouteStop(userText, stopText, lang, route) {
+    if (state.processing || state.recognizing) return;
+    const r = route || activeRoute;
+    if (!r) { localReply(userText, 'Nema aktivne rute. Reci, na primjer: daj mi rutu do Trogira.', lang); return; }
+    if (r !== activeRoute) { localReply(userText, 'Ta ruta više nije aktivna — dodajem samo na najnoviju rutu.', lang); return; }
+    return routeBusyRun(userText, lang, async () => {
+      renderRouteCard(r, '⏳ Tražim stajalište uz rutu…');
+      const out = await addStopToRoute(r, stopText);
+      renderRouteCard(r);
+      return out;
+    });
+  }
+  async function voiceRemoveStops(userText, which, lang) {
+    const r = activeRoute;
+    if (!r.stops.length) { await localReply(userText, 'Ruta nema usputnih stajališta.', lang); return; }
+    let removed;
+    if (which === 'all') { removed = r.stops.splice(0); }
+    else if (which === 'last') { removed = [r.stops.pop()]; }
+    else {
+      const kind = poiKind(which), n = routeNorm(cleanStopText(which));
+      removed = r.stops.filter(s => (kind && s.kind === kind.key) || (n && routeNorm(s.label).includes(n)));
+      if (!removed.length) { await localReply(userText, 'To stajalište nije na ruti.', lang); return; }
+      r.stops = r.stops.filter(s => !removed.includes(s));
+    }
+    await routeBusyRun(userText, lang, async () => {
+      r.at = Date.now();
+      await routeRecalc(r);
+      renderRouteCard(r);
+      return { spoken: (removed.length === 1 ? `Maknuo sam stajalište ${removed[0].label}.` : `Maknuo sam ${removed.length} stajališta.`) + routeStatsSpoken(r, true) };
+    });
+  }
+  function voiceStartNavigation(userText, lang) {
+    // Open straight away (closest to the mic tap) and don't talk over Google Maps.
+    startNavigation(activeRoute);
+    const msg = 'Pokrećem navigaciju u Google Kartama. Sretan put.';
+    addMessage('user', userText); addMessage('assistant', msg);
+    state.history.push({ role: 'user', content: userText }); state.history.push({ role: 'assistant', content: msg }); persistHistory();
+    setState('idle'); updateMic(); resumeWakeWordIfEnabled();
+  }
+
+  // ---------- Recognising route commands ----------
+  function routeModeFrom(x) {
+    let mode = 'driving';
+    const take = (re, m) => { if (re.test(x)) { mode = m; x = x.replace(re, ' ').replace(/\s+/g, ' ').trim(); } };
+    take(/,?\s*\b(pješice|pjesice|pješke|pjeske|hodajući|hodajuci|hodanjem|na\s+nogama|walking|on\s+foot)\b/i, 'walking');
+    take(/,?\s*\b(biciklom|na\s+biciklu|bicikl|by\s+bike|cycling)\b/i, 'bicycling');
+    take(/,?\s*\b(javnim\s+prijevozom|javnim\s+prevozom|tramvajem|autobusom|busom|vlakom|by\s+(bus|tram|train|public\s+transport))\b/i, 'transit');
+    take(/,?\s*\b(autom|automobilom|kolima|by\s+car|driving)\b/i, 'driving');
+    return { mode, rest: x };
+  }
+  function splitRouteStops(part) {
+    const m = /^(.*?)(?:,?\s+(?:i\s+)?(?:usput|putem|na\s+putu)\s+(?:mi\s+|nam\s+)?(?:stani\s+|stanimo\s+|svrati\s+|svratimo\s+|dodaj\s+)?(?:na\s+|u\s+|kod\s+|do\s+)?|\s+preko\s+|\s+kroz\s+|\s+via\s+|,?\s+(?:sa?|uz)\s+(?:usputn\w+\s+)?(?:stajalištem|stajalistem|stajalištima|stajalistima)\s+(?:na\s+|u\s+|kod\s+)?)(.+)$/i.exec(part);
+    if (!m || !m[1].trim()) return { dest: part.trim(), stops: [] };
+    return { dest: m[1].trim().replace(/,$/, ''), stops: m[2].split(/\s*,\s*|\s+i\s+|\s+and\s+/i).map(s => s.trim()).filter(Boolean) };
+  }
+  function parseFromTo(rest) {
+    let from = null, to = null, m;
+    rest = rest.trim();
+    if ((m = /^(?:odavde|odavdje|od\s+ovdje|from\s+here)\s+(.*)$/i.exec(rest))) { from = 'here'; rest = m[1]; }
+    if ((m = /^(?:od|from)\s+(.+?)\s+(?:do|to|prema|za|towards)\s+(.+)$/i.exec(rest))) { from = m[1]; to = m[2]; }
+    else if ((m = /^(?:do|to|prema|za|towards|na|u)\s+(.+?)\s+(?:od|from)\s+(.+)$/i.exec(rest))) { to = m[1]; from = m[2]; }
+    else if ((m = /^(?:do|to|prema|za|towards|na|u)\s+(.+)$/i.exec(rest))) { to = m[1]; }
+    if (!to) return null;
+    if (from && HERE_RE.test(from.trim())) from = 'here';
+    return { from, to };
+  }
+  function matchRouteIntent(text) {
+    let x = String(text || '').trim().replace(/[.!?]+$/, '').replace(/^(?:molim\s+te|molim|hej|ajde|ajmo|please)\s*,?\s+/i, '');
+    const mm = routeModeFrom(x); x = mm.rest;
+    const VERB = '(?:daj(?:te)?\\s+mi|pokaži\\s+mi|pokazi\\s+mi|prikaži\\s+mi|prikazi\\s+mi|napravi(?:\\s+mi)?|isplaniraj(?:\\s+mi)?|planiraj(?:\\s+mi)?|izračunaj(?:\\s+mi)?|izracunaj(?:\\s+mi)?|nađi(?:\\s+mi)?|nadji(?:\\s+mi)?|pronađi(?:\\s+mi)?|pronadji(?:\\s+mi)?|treba(?:m)?(?:\\s+mi)?|želim|zelim|hoću|hocu|otvori(?:\\s+mi)?|pokreni(?:\\s+mi)?|nova|novu|show\\s+me|give\\s+me|get\\s+me|plan)';
+    const NOUN = '(?:upute|uputu|rutu|ruta|smjer|navigaciju|navigacija|putanju|put|directions|route|the\\s+way)';
+    const forms = [
+      new RegExp(`^(?:${VERB}\\s+)?${NOUN}\\s+(?:za\\s+put\\s+|za\\s+vožnju\\s+|za\\s+voznju\\s+)?(.+)$`, 'i'),
+      /^(?:kako|kuda|kojim\s+putem)\s+(?:(?:da|ću|cu|mogu|bih|se|najbrže|najbrze)\s+)*(?:doći|doci|dođem|dodjem|stići|stici|stignem|ići|ici|idem|dolazi|stiže|stize|vozim|odem|otići|otici|krenuti)\s+(.+)$/i,
+      /^(?:vodi|odvedi|odvezi|navigiraj|usmjeri)\s+(?:me|nas)\s+(.+)$/i,
+      /^(?:navigiraj|navigate|navigation)\s+(.+)$/i,
+      /^koliko\s+(?:mi\s+|nam\s+)?(?:treba|trebam|ima|je|traje|daleko\s+je|je\s+daleko)\s+(?:vožnje\s+|voznje\s+|puta\s+|vremena\s+|kilometara\s+)?(.+)$/i,
+      /^(?:take\s+me|how\s+do\s+i\s+get|how\s+(?:can|do)\s+i\s+get)\s+(.+)$/i,
+    ];
+    for (const re of forms) {
+      const m = re.exec(x);
+      if (!m) continue;
+      const ft = parseFromTo(m[1]);
+      if (!ft || ft.to.length > 120) continue;
+      const sp = splitRouteStops(ft.to);
+      if (!sp.dest) continue;
+      return { from: ft.from, to: sp.dest, stops: sp.stops, mode: mm.mode };
+    }
+    return null;
+  }
+  // "gdje je najbliža benzinska", "nađi mi najbliži Lidl"
+  function matchNearestIntent(text) {
+    const x = String(text || '').trim().replace(/[.!?]+$/, '');
+    const m = /^(?:(?:gdje|di|koja|koji|kod)\s+(?:je|ima|se\s+nalazi)\s+|nađi(?:\s+mi)?\s+|nadji(?:\s+mi)?\s+|pronađi(?:\s+mi)?\s+|pronadji(?:\s+mi)?\s+|pokaži(?:\s+mi)?\s+|pokazi(?:\s+mi)?\s+|prikaži(?:\s+mi)?\s+|prikazi(?:\s+mi)?\s+|treba\s+mi\s+|trebam\s+|tražim\s+|trazim\s+|where\s+is\s+(?:the\s+)?|find(?:\s+me)?\s+(?:the\s+)?|show\s+me\s+(?:the\s+)?)?(najbli[žz]\w*|nearest|closest)\s+(.+)$/i.exec(x);
+    if (!m) return null;
+    const what = m[2].trim();
+    if (!what || what.split(/\s+/).length > 5) return null;
+    // A kind of place ("benzinska") or a capitalised name ("Lidl") — not "najbliža zvijezda".
+    const named = /^\p{Lu}/u.test(what);
+    if (!poiKind(what) && !named) return null;
+    return { what: `${m[1]} ${what}`, named };
+  }
+  // Commands that only make sense while a route is on screen.
+  function matchRouteFollowUp(text) {
+    const x = String(text || '').trim().replace(/[.!?]+$/, '');
+    const lx = x.toLowerCase();
+    if (/^(?:pokreni|započni|zapocni|startaj|uključi|ukljuci|otvori)\s+(?:mi\s+)?(?:navigaciju|navigacija|rutu|vožnju|voznju|google\s+karte|google\s+maps)$|^(?:kreni|krenimo|idemo|vozi|vozimo|start\s+navigation|start|let'?s\s+go)$/.test(lx)) return { action: 'navigate' };
+    if (/^(?:pokaži|pokazi|prikaži|prikazi)\s+(?:mi\s+)?(?:ponovno\s+|opet\s+)?(?:rutu|kartu\s+rute)$/.test(lx)) return { action: 'show' };
+    if (/^(?:makni|ukloni|izbaci|obriši|obrisi|izbriši|izbrisi)\s+(?:mi\s+)?(?:sva\s+)?(?:stajališta|stajalista|stanice)$|^bez\s+(?:ikakvih\s+)?(?:stajališta|stajalista|usputnih\s+stajališta|usputnih\s+stajalista)$/.test(lx)) return { action: 'remove', which: 'all' };
+    if (/^(?:makni|ukloni|izbaci|obriši|obrisi|izbriši|izbrisi|preskoči|preskoci)\s+(?:mi\s+)?(?:zadnje|posljednje|zadnju|posljednju|to)?\s*(?:stajalište|stajaliste|stanicu|stop)$/.test(lx)) return { action: 'remove', which: 'last' };
+    let m = /^(?:makni|ukloni|izbaci|preskoči|preskoci)\s+(?:mi\s+)?(.+?)(?:\s+(?:s|sa|iz)\s+rute)?$/.exec(lx);
+    if (m && !/\s(s|sa|iz)\s+(popisa|liste)/.test(lx) && activeRoute && (poiKind(m[1]) || activeRoute.stops.some(s => routeNorm(s.label).includes(routeNorm(m[1]))))) return { action: 'remove', which: m[1] };
+    // Adding a stop
+    if (/\s(na|u)\s+(popis|listu)\b/.test(lx)) return null; // that's the shopping list
+    m = /^(?:i\s+)?(?:dodaj|ubaci|stavi|uključi|ukljuci|add)\s+(?:mi\s+|nam\s+)?(?:još\s+|jos\s+)?(?:usput\s+|na\s+rutu\s+|u\s+rutu\s+)?(?:(?:a\s+)?stop\s+(?:at\s+)?)?(.+?)(?:\s+(?:na|u)\s+rutu|\s+usput|\s+na\s+putu)?$/i.exec(x);
+    if (m && (/stajali|stanic|usput|rut[uia]|na\s+putu|najbli|\bstop\b/i.test(x) || poiKind(m[1]))) return { action: 'add', stop: m[1] };
+    m = /^(?:i\s+)?(?:usput|putem|na\s+putu)\s+(?:mi\s+|nam\s+)?(?:stani\s+|stanimo\s+|svrati\s+|svratimo\s+|trebam\s+|treba\s+mi\s+)?(?:na\s+|u\s+|kod\s+|do\s+)?(.+)$/i.exec(x)
+      || /^(?:i\s+)?(?:stani|stanimo|svrati|svratimo|zaustavi\s+se|zaustavimo\s+se|stop\s+at)\s+(?:usput\s+)?(?:na\s+|u\s+|kod\s+|do\s+)?(.+)$/i.exec(x);
+    if (m) return { action: 'add', stop: m[1] };
+    // A bare "najbliža benzinska" right after planning a route joins that route.
+    const n = matchNearestIntent(x);
+    if (n && routeIsActive(ROUTE_IMPLICIT_MS)) return { action: 'add', stop: n.what };
+    return null;
+  }
+  function routeVoiceIntents(t, lang) {
+    if (routeIsActive()) {
+      const f = matchRouteFollowUp(t);
+      if (f) {
+        if (f.action === 'navigate') voiceStartNavigation(t, lang);
+        else if (f.action === 'show') { activeRoute.card = null; renderRouteCard(activeRoute); localReply(t, 'Evo rute.', lang); }
+        else if (f.action === 'remove') voiceRemoveStops(t, f.which, lang);
+        else voiceRouteStop(t, f.stop, lang);
+        return true;
+      }
+    }
+    const r = matchRouteIntent(t);
+    if (r) { voicePlanRoute(t, r, lang); return true; }
+    const n = matchNearestIntent(t);
+    if (n) { voicePlanRoute(t, { from: null, to: n.what, stops: [], mode: 'driving' }, lang); return true; }
+    return false;
   }
 
   // ---------- Single entry point for every recognised utterance ----------
@@ -4591,6 +5272,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const idea = matchIdeaIntent(t);
     if (idea) { idea.text ? voiceSaveIdea(t, idea.text, lang) : voiceAskForIdea(t, lang); return; }
     if (isReadIdeasIntent(t)) { voiceReadIdeas(t, lang); return; }
+    if (isShowIdeasIntent(t)) { voiceShowIdeas(t, lang); return; }
     if (genericHandleVoiceConfirm(t, lang)) return;
     if (pendingWarranty && warrantyAdjustFromVoice(t, lang)) return;
     if (contactHandleVoiceConfirm(t, lang)) return;
@@ -4603,6 +5285,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const settingIntent = matchSettingIntent(t);
     if (settingIntent) { voiceApplySetting(t, settingIntent, lang); return; }
     if (routeHouseholdIntents(t, lang)) return;
+    if (routeVoiceIntents(t, lang)) return;
     const panel = rezijePanelIntent(t);
     if (panel) {
       if (panel.action === 'close') { closeRezijePanel(); localReply(t, 'Zatvaram režije.', lang); }
@@ -5037,6 +5720,29 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         case 'show_map':     renderMapCard(toolUse.input);     return 'Map displayed to user.';
         case 'show_youtube': renderYouTubeCard(toolUse.input); return 'YouTube card displayed to user.';
         case 'show_link':    renderLinkCard(toolUse.input);    return 'Link card displayed to user.';
+        case 'plan_route': {
+          const i = toolUse.input || {};
+          const out = await planRoute({ from: i.origin || null, to: String(i.destination || ''), stops: Array.isArray(i.stops) ? i.stops.map(String) : [], mode: i.travel_mode });
+          return out.error ? 'Route NOT planned: ' + out.error : out.summary;
+        }
+        case 'add_route_stop': {
+          if (!routeIsActive()) return 'No route on screen. Plan one with plan_route first.';
+          renderRouteCard(activeRoute, '⏳ Tražim stajalište uz rutu…');
+          const r = await addStopToRoute(activeRoute, String(toolUse.input.stop || ''));
+          renderRouteCard(activeRoute);
+          return r.error ? 'Stop NOT added: ' + r.error : 'Stop added. ' + routeSummaryForModel(activeRoute);
+        }
+        case 'start_navigation': {
+          if (!routeIsActive()) return 'No route on screen. Plan one with plan_route first.';
+          const route = activeRoute;
+          pendingAfterReply = () => startNavigation(route); // open Google Maps once the sentence has been spoken
+          return 'Google Maps navigation opens right after your sentence.';
+        }
+        case 'show_ideas': {
+          const n = loadIdeas().length;
+          showIdeasCard();
+          return n ? `Ideas card shown with ${n} ideas. Don't read them aloud unless asked.` : 'The ideas notebook is empty (card shown). The user can say "Jarvis, nova ideja: …".';
+        }
         case 'set_reminder': {
           const r = addReminder(toolUse.input.message, toolUse.input.datetime_iso);
           return `Reminder scheduled for ${new Date(r.fireAt).toLocaleString()}.`;
@@ -6146,7 +6852,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
-  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message', 'start_navigation', 'show_ideas']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;

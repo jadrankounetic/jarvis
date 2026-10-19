@@ -2,7 +2,7 @@
 
 Automatske provjere koje učitavaju `../index.html` u simulirani preglednik (jsdom) i klikaju, govore i fotografiraju kao korisnik.
 
-- Ne trebaju API ključeve ni internet: AI modeli, Firebase baza, kamera, govor i imenik telefona su lažni (simulirani).
+- Ne trebaju API ključeve ni internet: AI modeli, Firebase baza, kamera, govor, imenik telefona, GPS i kartografski servisi su lažni (simulirani).
 - Ne sadrže osobne podatke: brojevi, imena i očitanja su izmišljeni.
 
 ## Pokretanje
@@ -23,7 +23,8 @@ npm test
 | `whatsapp.test.js` | WhatsApp/SMS: međunarodni broj, izravno otvaranje na Androidu, automatsko otvaranje |
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
-| `ideas.test.js` | Bilježnica ideja, "Jarvis," ispred naredbi, broj verzije |
+| `ideas.test.js` | Bilježnica ideja, kartica s idejama, "Jarvis," ispred naredbi, broj verzije |
+| `route.test.js` | Rute: GPS polazak, zadani polazak, usputna stajališta, najbliže mjesto, navigacija u Google Kartama, alat plan_route |
 | `household.test.js` | Popis za kupovinu, garancije, važni datumi, dnevni podsjetnici, podijeljeni tekst/slika/PDF |
 | `sw.test.js` | Servisni program za "Podijeli s Jarvisom" |
 | `settings-voice.test.js` | Teme boja, postavke glasom, alat change_setting, bez "glumljenja" promjena |

@@ -113,6 +113,6 @@ const callsSince = n => calls.slice(n).map(c => c.p);
   pass(w.localStorage.getItem('jarvis_forced_provider') === 'openai' && enabled().openai === true && w.localStorage.getItem('jarvis_auto_routing') === 'false', '"koristi samo ChatGPT" → OpenAI uključen i forsiran');
   pass(['A-KEY', 'G-KEY', 'O-KEY'].every((k, i) => w.localStorage.getItem(['jarvis_anthropic_key', 'jarvis_gemini_key', 'jarvis_openai_key'][i]) === k), 'Nijedan ključ nije izgubljen');
   click($('settingsBtn')); await sleep(30);
-  pass($('versionLabel').textContent === 'Verzija 8.9', 'Verzija 8.9');
+  pass($('versionLabel').textContent === 'Verzija 9.0', 'Verzija 9.0');
   process.exit(0);
 })().catch(e => { console.error('TEST ERROR', e); process.exit(1); });
