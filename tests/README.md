@@ -24,6 +24,7 @@ npm test
 | `calls.test.js` | Pozivi iz protokola i glasom, padeži imena |
 | `contacts.test.js` | Kontakti glasom i iz imenika, brzi poziv, sigurna potvrda |
 | `ideas.test.js` | Bilježnica ideja, kartica s idejama, "Jarvis," ispred naredbi, broj verzije |
+| `gallery.test.js` | Slika iz galerije: tipka 🖼, glasovne naredbe, opis, dokument, garancija i brojilo bez kamere, alat open_gallery |
 | `route.test.js` | Rute: GPS polazak, zadani polazak, usputna stajališta, najbliže mjesto, navigacija u Google Kartama, alat plan_route |
 | `household.test.js` | Popis za kupovinu, garancije, važni datumi, dnevni podsjetnici, podijeljeni tekst/slika/PDF |
 | `sw.test.js` | Servisni program za "Podijeli s Jarvisom" |

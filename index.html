@@ -787,6 +787,8 @@
     <div class="action-row">
       <button class="camera-btn" id="cameraBtn" title="Tap: describe scene · Hold: read document">📷</button>
       <button class="mic-btn" id="micBtn" data-active="false">🎤</button>
+      <button class="camera-btn" id="galleryBtn" title="Slika iz galerije" aria-label="Slika iz galerije">🖼</button>
+      <input type="file" id="galleryInput" accept="image/*" hidden>
     </div>
     <div class="mic-hint" id="micHint">Tap to speak</div>
   </div>
@@ -1306,7 +1308,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '9.0';
+  const JARVIS_VERSION = '9.1';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1356,10 +1358,11 @@ Tools available:
 - add_route_stop — add a stop to the route already on screen ("dodaj usput najbližu benzinsku").
 - start_navigation — start turn-by-turn navigation in Google Maps for the route on screen.
 - show_ideas — show the ideas notebook (saved upgrade ideas) on screen.
+- open_gallery — the user wants to load, pick or analyse a photo from the phone's gallery. The phone only opens the gallery after a tap, so this shows a card with an "Odaberi sliku" button; tell the user to tap it.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
 You cannot change your own code, layout, fonts or features. The ONLY things about yourself you can change are the options of change_setting. If the user asks for any other change to you or your interface, say plainly that you cannot do that yourself and ask whether to save it as an idea for a future upgrade (in Croatian: "Želiš li da to zapišem kao novu ideju?"); if they agree, call save_idea. Never claim a change that a tool did not confirm.
 
-For display tools (show_map/show_youtube/show_link/show_ideas/start_navigation): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
+For display tools (show_map/show_youtube/show_link/show_ideas/start_navigation/open_gallery): ALWAYS speak a short sentence first, then call the tool — don't describe what's shown, the user will see it. Don't read out URLs aloud.
 For all other tools: call directly, then briefly summarize the result in speech.`;
 
   const PERSONALITY_LINES = [
@@ -1721,6 +1724,14 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       name: 'start_navigation',
       description: 'Open Google Maps turn-by-turn navigation for the route currently on screen.',
       input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'open_gallery',
+      description: 'Show a card with an "Odaberi sliku" button that opens the phone\'s photo gallery. After the user picks a photo, Jarvis describes it, reads it as a document or receipt, saves a warranty, or reads a utility meter.',
+      input_schema: {
+        type: 'object',
+        properties: { purpose: { type: 'string', enum: ['scene', 'document', 'warranty', 'meter'], description: 'What to do with the photo, if the user said it: describe, read a document/receipt, save a warranty, read a meter.' } }
+      }
     },
     {
       name: 'show_ideas',
@@ -2537,6 +2548,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     micBtn.disabled = state.processing || state.cameraActive; // stays enabled while speaking so it can interrupt
     const camBtn = $('cameraBtn');
     if (camBtn) camBtn.disabled = state.processing || state.speaking || state.recognizing || state.cameraActive;
+    const galBtn = $('galleryBtn');
+    if (galBtn) galBtn.disabled = state.processing || state.recognizing || state.cameraActive;
     if (state.processing) micHint.textContent = 'Thinking...';
     else if (state.speaking) micHint.textContent = 'Speaking — tap to interrupt';
     else if (state.cameraActive) micHint.textContent = 'Camera active...';
@@ -3601,7 +3614,7 @@ Rules:
     throw lastErr;
   }
 
-  async function handleMeterCapture(spokenText, lang, hint) {
+  async function handleMeterCapture(spokenText, lang, hint, givenBase64) {
     if (state.recognizing || state.processing || state.speaking || state.cameraActive) return;
     const label = spokenText || (hint === 'k' ? '📷 Brojilo struje' : hint === 'v' ? '📷 Brojilo vode' : '📷 Brojilo');
     addMessage('user', label);
@@ -3617,12 +3630,14 @@ Rules:
     hint = hint || meterHintFromText(spokenText);
 
     stopWakeWordListening();
-    state.cameraActive = true; setState('camera'); updateMic();
-    let base64;
-    try { base64 = await captureFromCamera(); }
-    catch (err) { state.cameraActive = false; setState('idle'); updateMic(); await say(`Kamera nije dostupna: ${err.message}`, true); return; }
-    state.cameraActive = false;
-    if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; }
+    let base64 = givenBase64 || null; // a photo from the gallery or shared from another app
+    if (!base64) {
+      state.cameraActive = true; setState('camera'); updateMic();
+      try { base64 = await captureFromCamera(); }
+      catch (err) { state.cameraActive = false; setState('idle'); updateMic(); await say(`Kamera nije dostupna: ${err.message}`, true); return; }
+      state.cameraActive = false;
+      if (!base64) { setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; }
+    }
 
     state.processing = true; setState('thinking'); updateMic();
     let reading;
@@ -3645,7 +3660,9 @@ Rules:
       return;
     }
     if (!type) {
-      await say(`Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "slikaj brojilo vode" ili "slikaj brojilo struje".`);
+      await say(givenBase64
+        ? `Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "brojilo vode" ili "brojilo struje".`
+        : `Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "slikaj brojilo vode" ili "slikaj brojilo struje".`);
       return;
     }
     let check;
@@ -3655,8 +3672,8 @@ Rules:
     const what = type === 'v' ? `${numHr(reading.value)} kubika na brojilu vode` : `${numHr(reading.value)} kilovatsati na brojilu struje`;
     let next;
     if (check.problems.length) next = check.problems.join(' ') + ' Slikaj ponovno ili mi reci ispravan broj.';
-    else if (utilDraft.v == null) next = 'Sada slikaj brojilo vode.';
-    else if (utilDraft.k == null) next = 'Sada slikaj brojilo struje.';
+    else if (utilDraft.v == null) next = givenBase64 ? 'Sada slikaj brojilo vode ili ga odaberi iz galerije.' : 'Sada slikaj brojilo vode.';
+    else if (utilDraft.k == null) next = givenBase64 ? 'Sada slikaj brojilo struje ili ga odaberi iz galerije.' : 'Sada slikaj brojilo struje.';
     else next = (check.preview ? `Režije za ovo razdoblje bit će ${eur(check.preview.uk)}. ` : '') + 'Reci "potvrdi" za spremanje ili "odustani".';
     if (check.warnings.length && !check.problems.length) next = check.warnings.join(' ') + ' ' + next;
     await say(`Očitao sam ${what}. ${next}`);
@@ -4336,20 +4353,26 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const s = sharedItem; const L = () => currentLang();
     const preview = (s.text || '').replace(s.url || '\u0000', '').trim();
     let body = '';
-    if (s.kind === 'image') body += `<img src="data:image/jpeg;base64,${s.base64}" alt="Podijeljena slika" style="width:100%;display:block;margin-bottom:6px;">`;
+    if (s.kind === 'image') body += `<img src="data:image/jpeg;base64,${s.base64}" alt="${s.source === 'gallery' ? 'Slika iz galerije' : 'Podijeljena slika'}" style="width:100%;max-height:260px;object-fit:contain;background:#000;display:block;margin-bottom:6px;">`;
     if (s.kind === 'pdf') body += utilRow('PDF', s.name || 'dokument');
     if (s.title) body += utilRow('Naslov', s.title.slice(0, 120));
     if (s.url) body += utilRow('Poveznica', s.url.length > 60 ? s.url.slice(0, 60) + '…' : s.url);
     if (preview && s.kind === 'text') body += `<div class="util-row"><span class="util-l" style="white-space:pre-wrap;text-align:left;">${escapeHtml(preview.slice(0, 300))}${preview.length > 300 ? '…' : ''}</span></div>`;
-    const img = (label, text, mode) => ({ label, onClick: () => handleCameraRequest(text, L(), { mode, base64: s.base64, mime: s.mime }) });
-    const buttons = s.kind === 'image' ? [img('Opiši', 'Opiši podijeljenu sliku.', 'scene'), img('Pročitaj dokument', 'Pročitaj podijeljeni dokument.', 'document'), img('Spremi garanciju', 'Spremi garanciju s podijeljene slike.', 'warranty')]
+    const img = (label, text, mode) => ({ label, onClick: () => s.kind === 'image' ? runImageAction(mode, text, L()) : handleCameraRequest(text, L(), { mode, base64: s.base64, mime: s.mime }) });
+    const g = s.source === 'gallery';
+    const imageButtons = [img('Opiši', g ? 'Opiši sliku iz galerije.' : 'Opiši podijeljenu sliku.', 'scene'),
+      img('Pročitaj dokument', g ? 'Pročitaj dokument sa slike.' : 'Pročitaj podijeljeni dokument.', 'document'),
+      img('Spremi garanciju', g ? 'Spremi garanciju sa slike.' : 'Spremi garanciju s podijeljene slike.', 'warranty')];
+    if (utilConfigured()) imageButtons.push(img('Očitaj brojilo', 'Očitaj brojilo sa slike.', 'meter'));
+    const buttons = s.kind === 'image' ? imageButtons
       : s.kind === 'pdf' ? [{ label: 'Sažmi', onClick: () => sharedSummarizePdf(L()) }, img('Pročitaj dokument', 'Pročitaj podijeljeni PDF.', 'document'), img('Spremi garanciju', 'Spremi garanciju iz PDF-a.', 'warranty')]
       : [{ label: 'Sažmi', onClick: () => sharedAsk('Sažmi ukratko, u 3 do 5 rečenica.', '📥 Sažmi', L()) },
          { label: 'Prevedi', onClick: () => sharedAsk('Prevedi na hrvatski. Ako je već na hrvatskom, prevedi na engleski.', '📥 Prevedi', L()) },
          { label: 'Na popis', onClick: () => sharedToShopping(L()) },
          { label: 'U kalendar', onClick: () => sharedAsk('Iz ovog sadržaja napravi događaj u mom kalendaru (alat create_calendar_event). Ako nema jasnog datuma i vremena, pitaj me.', '📥 U kalendar', L()) },
          { label: 'Kao ideju', onClick: () => sharedToIdea(L()) }];
-    utilCard(null, 'PODIJELJENO', body, buttons, '📥');
+    utilCard(null, s.source === 'gallery' ? 'IZ GALERIJE' : 'PODIJELJENO', body, buttons, s.source === 'gallery' ? '🖼' : '📥');
+    if (s.source === 'gallery') return; // the gallery flow speaks its own question
     addMessage('assistant', s.kind === 'image' ? 'Primio sam sliku. Što da napravim s njom?' : s.kind === 'pdf' ? 'Primio sam PDF. Što da napravim s njim?'
       : (s.url && !preview ? 'Primio sam poveznicu. Što da napravim s njom?' : 'Primio sam tekst. Što da napravim s njim?'));
   }
@@ -4393,17 +4416,111 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const idea = addIdea(t);
     await localReply('📥 Kao ideju', idea ? 'Zapisao sam to kao ideju.' : 'Nema teksta za zapisati.', lang);
   }
-  function handleSharedVoice(t, lang) {
+  // freeQuestion: false = only clear commands; 'named' = also "što piše na ovoj slici";
+  // 'first' = also any question, when it is the first thing said after picking the picture.
+  function handleSharedVoice(t, lang, freeQuestion = 'named') {
     const s = sharedItem, x = normText(t);
-    if (s.kind === 'image' || s.kind === 'pdf') {
+    if (s.kind === 'image') {
+      if (/\bocitaj|brojil|vodomjer|strujomjer/.test(x)) { runImageAction('meter', t, lang); return true; }
+      if (/garanc|jamstv/.test(x)) { runImageAction('warranty', t, lang); return true; }
+      if (/procitaj|dokument|racun|podatk|posjetnic/.test(x)) { runImageAction('document', t, lang); return true; }
+      if (/opis|sto je|sta je|na slici|vidis|prepoznaj/.test(x)) { runImageAction('scene', t, lang); return true; }
+      // "koliko kalorija ima ovo jelo?" — a question about the picture: anything that names the
+      // picture, or the very first thing said within 3 minutes of picking it.
+      const namesIt = /\b(ov[aeiou]j?|t[aeiou]j?|toj|ovoj)\s+(slic\w*|slik\w*|fotk\w*|fotografij\w*)|\b(na|sa|s)\s+(slici|slike|fotki|fotke|fotografiji|fotografije)\b/.test(x);
+      if ((freeQuestion && namesIt) || (freeQuestion === 'first' && Date.now() - s.at < 3 * 60000)) { runImageAction('scene', t, lang); return true; }
+      return false;
+    }
+    if (s.kind === 'pdf') {
       if (/garanc|jamstv/.test(x)) { handleCameraRequest(t, lang, { mode: 'warranty', base64: s.base64, mime: s.mime }); return true; }
       if (s.kind === 'pdf' && /sazm|sazet/.test(x)) { sharedSummarizePdf(lang); return true; }
       if (/procitaj|dokument|racun|podatk/.test(x)) { handleCameraRequest(t, lang, { mode: 'document', base64: s.base64, mime: s.mime }); return true; }
-      if (s.kind === 'image' && /opis|sto je|sta je|na slici|vidis/.test(x)) { handleCameraRequest(t, lang, { mode: 'scene', base64: s.base64 }); return true; }
       return false;
     }
     if (/(zapisi|spremi).*(ideju)/.test(x)) { sharedToIdea(lang); return true; }
     return false;
+  }
+
+  // ---------- Picture from the gallery ----------
+  // Chrome shows the photo picker only right after a tap: the 🖼 button opens it
+  // straight away; a voice command opens it while the mic tap is still fresh,
+  // and always leaves a card with an "Odaberi sliku" button. The picked photo is
+  // handled exactly like a photo shared from another app (sharedItem).
+  let galleryPending = null; // { mode, text, lang } — what to do once a photo is picked
+  let galleryCard = null;
+  const GALLERY_MODES = { scene: 'opis', document: 'dokument / račun', warranty: 'garancija', meter: 'brojilo' };
+  function galleryModeFromText(t) {
+    const x = normText(t);
+    if (/brojil|vodomjer|strujomjer/.test(x)) return 'meter';
+    if (/garanc|jamstv/.test(x)) return 'warranty';
+    if (/racun|dokument|posjetnic|priznanic|procitaj|podatk/.test(x)) return 'document';
+    if (/opis|sto je|sta je|sto vidis|prepoznaj|analiz/.test(x)) return 'scene';
+    return null;
+  }
+  function isGalleryIntent(t) {
+    const x = normText(t);
+    return /\b(galerij\w*|gallery|album\w*)\b/.test(x)
+      && /\b(slik\w*|fotk\w*|fotografij\w*|photo|picture|image|otvori|ucitaj|odaberi|izaberi|uzmi|dodaj|posalji|pokazi|open|pick|load|racun\w*|brojil\w*|garancij\w*|dokument\w*)\b/.test(x);
+  }
+  function openGalleryPicker(mode, text, lang) {
+    galleryPending = { mode: mode || null, text: text || '', lang: lang || currentLang() };
+    const input = $('galleryInput');
+    input.value = '';
+    try { input.click(); } catch (e) { /* the card's button is the fallback */ }
+  }
+  function showGalleryCard(mode, text, lang) {
+    const what = mode ? `Nakon odabira: ${GALLERY_MODES[mode]}.` : 'Nakon odabira biraš: opis, dokument ili račun, garancija' + (utilConfigured() ? ', brojilo.' : '.');
+    galleryCard = utilCard(galleryCard, 'GALERIJA', `<div class="util-row"><span class="util-l" style="text-align:left;">${escapeHtml(what)}</span></div>`,
+      [{ label: '🖼 Odaberi sliku', cls: 'util-save', onClick: () => openGalleryPicker(mode, text, lang || currentLang()) }], '🖼');
+    return galleryCard;
+  }
+  async function voiceOpenGallery(t, lang) {
+    const mode = galleryModeFromText(t);
+    const ua = navigator.userActivation;
+    const canOpen = !ua || ua.isActive; // the mic tap still counts as a tap
+    addMessage('user', t);
+    if (galleryCard && galleryCard.isConnected) galleryCard.remove();
+    galleryCard = null;
+    showGalleryCard(mode, t, lang);
+    if (canOpen) openGalleryPicker(mode, t, lang);
+    await localReply(t, canOpen ? 'Odaberi sliku.' : 'Dodirni tipku Odaberi sliku.', lang, true);
+  }
+  async function waitUntilQuiet(ms) {
+    const t0 = Date.now();
+    while ((state.speaking || state.processing) && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 50));
+  }
+  // Runs one action on the waiting picture (gallery or shared): scene, document, warranty, meter.
+  async function runImageAction(mode, text, lang) {
+    const s = sharedItem;
+    if (!s || s.kind !== 'image' || !sharedFresh()) return;
+    if (state.speaking) { interruptSpeech(); await waitUntilQuiet(1500); }
+    s.fresh = false; s.lastUse = Date.now();
+    if (mode === 'meter') { handleMeterCapture(text || 'Očitaj brojilo sa slike.', lang, meterHintFromText(text), s.base64); return; }
+    handleCameraRequest(text || '', lang, { mode, base64: s.base64, mime: s.mime });
+  }
+  // Right after a picture was used, "opiši je", "pročitaj račun" or "očitaj brojilo"
+  // mean that picture, not a new camera photo.
+  function imageShortcutActive() {
+    return sharedFresh() && sharedItem.kind === 'image' && Date.now() - (sharedItem.lastUse || sharedItem.at) < 5 * 60000;
+  }
+  async function onGalleryPicked() {
+    const input = $('galleryInput');
+    const file = input.files && input.files[0];
+    const pend = galleryPending || { mode: null, text: '', lang: currentLang() };
+    galleryPending = null;
+    if (!file) return;
+    if (file.type && !/^image\//.test(file.type)) { addMessage('error', 'Odabrana datoteka nije slika.'); return; }
+    let base64;
+    try { base64 = await blobToJpegBase64(file); }
+    catch (e) { addMessage('error', 'Sliku nije moguće učitati: ' + (e && e.message ? e.message : 'nepoznata greška')); return; }
+    if (galleryCard && galleryCard.isConnected) galleryCard.remove();
+    galleryCard = null;
+    sharedItem = { kind: 'image', base64, mime: 'image/jpeg', name: file.name || '', title: '', text: '', url: '', at: Date.now(), source: 'gallery', fresh: true };
+    renderSharedCard();
+    if (pend.mode) { runImageAction(pend.mode, pend.text, pend.lang); return; }
+    const q = 'Učitao sam sliku. Što da napravim s njom?';
+    addMessage('assistant', q);
+    if (!state.speaking && !state.processing && !state.recognizing) await speak(q, pend.lang);
   }
 
   // ---------- Settings by voice (only safe, predefined options) ----------
@@ -5264,6 +5381,9 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (!raw) return;
     // "Jarvis, nazovi Martinu" said after tapping the mic: the name is not part of the command.
     const t = raw.replace(/^jarvis\w*[\s,.:;!-]+/i, '').trim() || raw;
+    // A question right after picking a gallery photo is about that photo — only the first one.
+    const firstAfterPick = !!(sharedItem && sharedItem.fresh);
+    if (firstAfterPick) sharedItem.fresh = false;
     if (pendingIdeaUntil && Date.now() < pendingIdeaUntil) {
       pendingIdeaUntil = 0;
       if (/^(odustani|ne|ništa|nista|cancel)[.!]?$/i.test(t)) { localReply(t, 'U redu, ništa nisam zapisao.', lang); return; }
@@ -5292,6 +5412,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       else { openRezijePanel(panel.tab); localReply(t, 'Otvaram režije.', lang); }
       return;
     }
+    if (isGalleryIntent(t)) { voiceOpenGallery(t, lang); return; }
+    if (imageShortcutActive() && handleSharedVoice(t, lang, false)) return;
     if (isMeterIntent(t)) { handleMeterCapture(t, lang); return; }
     const protocol = matchProtocolIntent(t);
     if (protocol) { runProtocol(protocol, lang); return; }
@@ -5299,7 +5421,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (call) { placeCall(t, call.phone, call.label, lang, null, { immediate: true }); return; }
     if (isDocumentIntent(t)) { handleCameraRequest(t, lang, { mode: 'document' }); return; }
     if (isCameraIntent(t)) { handleCameraRequest(t, lang); return; }
-    if (sharedFresh() && handleSharedVoice(t, lang)) return;
+    if (sharedFresh() && handleSharedVoice(t, lang, firstAfterPick ? 'first' : 'named')) return;
     if (sharedFresh() && sharedItem.kind === 'text') {
       sharedTextContent().then(content => handleUserMessage(`${t}\n\n[Podijeljeni sadržaj]\n${content}`, lang, { displayText: t }));
       return;
@@ -5737,6 +5859,11 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
           const route = activeRoute;
           pendingAfterReply = () => startNavigation(route); // open Google Maps once the sentence has been spoken
           return 'Google Maps navigation opens right after your sentence.';
+        }
+        case 'open_gallery': {
+          const mode = ['scene', 'document', 'warranty', 'meter'].includes(toolUse.input && toolUse.input.purpose) ? toolUse.input.purpose : null;
+          showGalleryCard(mode, '', currentLang());
+          return 'Gallery card shown. The user must tap "Odaberi sliku" to open the gallery (phones only open it after a tap). Say that in one short sentence.';
         }
         case 'show_ideas': {
           const n = loadIdeas().length;
@@ -6852,7 +6979,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
-  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message', 'start_navigation', 'show_ideas']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message', 'start_navigation', 'show_ideas', 'open_gallery']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;
@@ -6896,6 +7023,12 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       handleCameraRequest('', lang, { mode: 'scene' });
     });
   })();
+  $('galleryBtn').addEventListener('click', () => {
+    if (state.speaking) interruptSpeech();
+    openGalleryPicker(null, '', currentLang());
+  });
+  $('galleryInput').addEventListener('change', onGalleryPicked);
+  $('galleryInput').addEventListener('cancel', () => { galleryPending = null; });
   $('settingsBtn').addEventListener('click', openSettings);
   $('clearBtn').addEventListener('click', clearHistory);
   $('saveSettings').addEventListener('click', saveSettings);
