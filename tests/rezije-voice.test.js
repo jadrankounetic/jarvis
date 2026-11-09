@@ -5,7 +5,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').r
 
 // ---------- Lažna Firebase baza ----------
 const P = { c_m3_v: 1.68, fix_v: 0, c_kwh_s: 0.142714, mjer: 1.73, pdv_s: 0.13, doi: 0.982, smece: 0, kom: 0, amis: 0, hrt: 10.62, ost: 0 };
-const db = { params: { ...P }, entries: [
+// Cijene sada (HEP Plavi, kao u aplikaciji za režije); stari unosi zadržavaju cijene svog vremena.
+const PH = { c_m3_v: 1.68, fix_v: 0, c_opsk: 0.091324, c_dist: 0.037608, c_prij: 0.014716, c_oie: 0.013239, c_sol: 0.003982, c_solp: 0.003982, n_omm: 1.983, n_opsk: 0.982, pdv_s: 0.13, smece: 0, kom: 0, amis: 0, hrt: 10.62, ost: 0 };
+const db = { params: { ...PH }, entries: [
   { id: 1, d: '01.07.2026.', v: 1250, k: 12000, p: { ...P } },
   { id: 2, d: '01.08.2026.', v: 1262, k: 12150, p: { ...P } },
 ] };
@@ -71,7 +73,13 @@ const lastText = () => { const m = d.querySelectorAll('.msg-assistant .msg-text,
 const btn = (label) => [...d.querySelectorAll('.util-actions button')].reverse().find(b => b.textContent.includes(label));
 const capture = async () => { await waitFor(() => d.querySelector('.camera-btn-capture'), 'camera open'); await sleep(30); click(d.querySelector('.camera-btn-capture')); };
 const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
-const expectedUk = (a, b) => { const vt = (b.v - a.v) * P.c_m3_v + P.fix_v; const st = ((b.k - a.k) + P.doi) * P.c_kwh_s * (1 + P.pdv_s); return vt + st + P.smece + P.kom + P.amis + P.hrt + P.ost; };
+// Neovisna referenca formule aplikacije za režije (HEP Plavi): svaka stavka zaokružena na cent.
+const c2 = n => Math.round(n * 100) / 100;
+const pdHr = s => { const t = s.replace(/\.$/, '').split('.'); return new Date(+t[2], +t[1] - 1, +t[0]); };
+const today = () => { const n = new Date(); return `${String(n.getDate()).padStart(2, '0')}.${String(n.getMonth() + 1).padStart(2, '0')}.${n.getFullYear()}.`; };
+const months = (d1, d2) => { const dn = Math.round((pdHr(d2) - pdHr(d1)) / 86400000); return dn <= 0 || (dn >= 28 && dn <= 31) ? 1 : Math.round(dn / 30 * 100) / 100; };
+const hep = (kw, mj, c) => { const os = c2(c2(kw * c.c_opsk) + c2(kw * c.c_prij) + c2(kw * c.c_dist) + c2(mj * c.n_opsk) + c2(mj * c.n_omm) + c2(kw * c.c_oie) + c2(kw * c.c_sol) - c2(kw * c.c_solp)); return c2(os + c2(os * c.pdv_s)); };
+const expectedUk = (a, b) => { const vt = (b.v - a.v) * PH.c_m3_v + PH.fix_v; const st = hep(Math.round(b.k - a.k), months(a.d, b.d || today()), PH); return vt + st + PH.smece + PH.kom + PH.amis + PH.hrt + PH.ost; };
 
 (async () => {
   await sleep(300);
@@ -83,7 +91,7 @@ const expectedUk = (a, b) => { const vt = (b.v - a.v) * P.c_m3_v + P.fix_v; cons
   await say('potvrdi');
   pass(geminiCalls === callsBefore, '"potvrdi" obrađen lokalno, bez poziva AI modela');
   pass(db.entries.length === 3 && db.entries[2].v === 1275 && db.entries[2].k === 12250 && db.entries[2].d.match(/^\d\d\.\d\d\.\d{4}\.$/), 'Novi unos na indeksu 2, ispravan format datuma');
-  pass(JSON.stringify(db.entries[2].p) === JSON.stringify(P), 'Uz unos spremljena kopija trenutnih cijena');
+  pass(JSON.stringify(db.entries[2].p) === JSON.stringify(PH), 'Uz unos spremljena kopija trenutnih cijena');
   pass(fbLog.includes('PUT /entries/2') && !fbLog.some(l => l === 'PUT /'), 'Ciljani upis (samo jedan unos, nikad cijela baza)');
   const uk1 = expectedUk(db.entries[1], db.entries[2]).toFixed(2).replace('.', ',');
   pass(lastText().includes(uk1), `Izgovoreni iznos odgovara formuli aplikacije za režije (${uk1} €)`);

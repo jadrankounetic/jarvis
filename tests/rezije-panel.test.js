@@ -5,7 +5,9 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').r
 
 // ---------- Lažna Firebase baza ----------
 const P = { c_m3_v: 1.68, fix_v: 0, c_kwh_s: 0.142714, mjer: 1.73, pdv_s: 0.13, doi: 0.982, smece: 0, kom: 0, amis: 0, hrt: 10.62, ost: 0 };
-const db = { params: { ...P }, entries: [
+// Cijene sada (HEP Plavi, kao u aplikaciji za režije); stari unosi zadržavaju cijene svog vremena.
+const PH = { c_m3_v: 1.68, fix_v: 0, c_opsk: 0.091324, c_dist: 0.037608, c_prij: 0.014716, c_oie: 0.013239, c_sol: 0.003982, c_solp: 0.003982, n_omm: 1.983, n_opsk: 0.982, pdv_s: 0.13, smece: 0, kom: 0, amis: 0, hrt: 10.62, ost: 0 };
+const db = { params: { ...PH }, entries: [
   { id: 1, d: '01.07.2026.', v: 1250, k: 12000, p: { ...P } },
   { id: 2, d: '01.08.2026.', v: 1262, k: 12150, p: { ...P } },
 ] };
@@ -71,7 +73,13 @@ const lastText = () => { const m = d.querySelectorAll('.msg-assistant .msg-text,
 const btn = (label) => [...d.querySelectorAll('.util-actions button')].reverse().find(b => b.textContent.includes(label));
 const capture = async () => { await waitFor(() => d.querySelector('.camera-btn-capture'), 'camera open'); await sleep(30); click(d.querySelector('.camera-btn-capture')); };
 const pass = (c, m) => console.log((c ? 'PASS' : 'FAIL') + ' — ' + m);
-const expectedUk = (a, b) => { const vt = (b.v - a.v) * P.c_m3_v + P.fix_v; const st = ((b.k - a.k) + P.doi) * P.c_kwh_s * (1 + P.pdv_s); return vt + st + P.smece + P.kom + P.amis + P.hrt + P.ost; };
+// Neovisna referenca formule aplikacije za režije (HEP Plavi): svaka stavka zaokružena na cent.
+const c2 = n => Math.round(n * 100) / 100;
+const pdHr = s => { const t = s.replace(/\.$/, '').split('.'); return new Date(+t[2], +t[1] - 1, +t[0]); };
+const today = () => { const n = new Date(); return `${String(n.getDate()).padStart(2, '0')}.${String(n.getMonth() + 1).padStart(2, '0')}.${n.getFullYear()}.`; };
+const months = (d1, d2) => { const dn = Math.round((pdHr(d2) - pdHr(d1)) / 86400000); return dn <= 0 || (dn >= 28 && dn <= 31) ? 1 : Math.round(dn / 30 * 100) / 100; };
+const hep = (kw, mj, c) => { const os = c2(c2(kw * c.c_opsk) + c2(kw * c.c_prij) + c2(kw * c.c_dist) + c2(mj * c.n_opsk) + c2(mj * c.n_omm) + c2(kw * c.c_oie) + c2(kw * c.c_sol) - c2(kw * c.c_solp)); return c2(os + c2(os * c.pdv_s)); };
+const expectedUk = (a, b) => { const vt = (b.v - a.v) * PH.c_m3_v + PH.fix_v; const st = hep(Math.round(b.k - a.k), months(a.d, b.d || today()), PH); return vt + st + PH.smece + PH.kom + PH.amis + PH.hrt + PH.ost; };
 
 
 const input = (id, v) => { const el = $(id); el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); };
@@ -112,7 +120,7 @@ const panelOpen = () => $('rzPanel').dataset.open === 'true';
   click($('rzSavePrices')); await sleep(80);
   pass($('rzPriceStatus').textContent.includes('Nema promjena') && !fbLog.slice(logLen).includes('PATCH /params'), 'Bez promjena: ništa se ne šalje');
   input('rzp_hrt', '11'); click($('rzSavePrices')); await waitFor(() => $('rzPriceStatus') && $('rzPriceStatus').textContent.includes('spremljene'), 'price saved');
-  pass(db.params.hrt === 11 && db.params.pdv_s === 0.13 && db.params.c_kwh_s === P.c_kwh_s, 'Promijenjen samo HRT, ostale cijene netaknute');
+  pass(db.params.hrt === 11 && db.params.pdv_s === 0.13 && db.params.c_opsk === PH.c_opsk, 'Promijenjen samo HRT, ostale cijene netaknute');
   pass(db.entries[2].p.hrt === 10.62, 'Stara očitanja zadržala stare cijene');
 
   console.log('--- 5. Brisanje iz tablice (srednje očitanje) ---');
