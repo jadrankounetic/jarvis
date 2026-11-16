@@ -1359,7 +1359,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.0';
+  const JARVIS_VERSION = '10.1';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1393,6 +1393,7 @@ Tools available:
 - get_expense_summary — the user asks about spending or expenses tracked from scanned receipts.
 - add_meter_reading — the user gives household meter readings (voda/water in m³, struja/electricity in kWh) for the režije tracker. Values may come in separate turns. A kontrolno (control) reading is electricity only: pass control: true. The regular monthly reading is obračunsko (water + electricity). If the user gives only electricity without saying which, ask whether it is obračunsko or kontrolno. It never saves by itself: read the values back and ask the user to say "potvrdi" to save or "odustani" to cancel.
 - get_meter_status — "glavno stanje struje", "obračunsko stanje", "stanje brojila", "kontrolno stanje": the latest readings themselves (not costs).
+- get_meter_history — consumption or cost between ANY two dates ("ovaj mjesec do danas", "prošli tjedan", "od 4. do 9. studenog", "od rujna"), or listing past readings. Resolve relative dates yourself from the current date and pass from/to as YYYY-MM-DD. Electricity uses billing and control readings, water only billing readings.
 - capture_meter_photo — the user wants to photograph, scan or read a meter (brojilo, vodomjer, strujomjer).
 - get_utility_summary — questions about režije / utility costs: last period, average, trend, comparisons.
 - get_utility_prices — questions about current utility prices or fixed fees.
@@ -1607,6 +1608,19 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
           meter: { type: 'string', enum: ['water', 'electricity'], description: 'Which meter, if the user said.' },
           control: { type: 'boolean', description: 'true if the user wants a kontrolno (control) electricity reading.' }
         }
+      }
+    },
+    {
+      name: 'get_meter_history',
+      description: 'Full history of režije meter readings (obračunska = billing and kontrolna = control) between two dates, plus consumption, kWh/day and estimated cost between them, computed exactly like the utilities app. When no reading exists on an asked date, the nearest reading is used and reported. Shows a card.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'Start date YYYY-MM-DD.' },
+          to: { type: 'string', description: 'End date YYYY-MM-DD. Omit for today.' },
+          meter: { type: 'string', enum: ['electricity', 'water', 'both'], description: 'Default both.' }
+        },
+        required: ['from']
       }
     },
     {
@@ -4158,6 +4172,160 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     await localReply(userText, msg, lang, true);
   }
 
+  // ---------- Režije: full history and consumption between any two dates ----------
+  // Electricity uses every reading (billing and control); water only billing readings
+  // (control readings carry no water). For each asked date the reading on that day is
+  // used, otherwise the nearest one — and Jarvis says which one it took.
+  function utilDateOnly(dt) { return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()); }
+  function utilHrFromDate(dt) { return `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.${dt.getFullYear()}.`; }
+  // Pick the reading for an asked date: same day first (billing preferred), otherwise nearest.
+  function utilPickReading(list, dt, side) {
+    let best = null, bestDiff = Infinity;
+    for (const e of list) {
+      const d = utilParseDate(e.d); if (!d) continue;
+      const diff = Math.round((d - dt) / 86400000);
+      const a = Math.abs(diff);
+      const better = a < bestDiff
+        || (a === bestDiff && best && (
+          (a === 0 && best.ko && !e.ko) ||                 // same day: billing over control
+          (a > 0 && (side === 'from' ? diff < 0 : diff > 0)) // tie: before the start / after the end
+        ));
+      if (better) { best = e; bestDiff = a; }
+    }
+    return best ? { e: best, off: bestDiff } : null;
+  }
+  // from/to: Date objects (to defaults to today). meter: 'k' | 'v' | 'both'.
+  function utilRange(data, from, to, meter) {
+    const all = data.entries.filter(e => utilParseDate(e.d));
+    from = utilDateOnly(from); to = utilDateOnly(to || new Date());
+    if (from > to) [from, to] = [to, from];
+    const out = { from, to, k: null, v: null, rows: [], notes: [] };
+    const span = (a, b) => {
+      const da = utilParseDate(a.e.d), db = utilParseDate(b.e.d);
+      return { a, b, days: Math.round((db - da) / 86400000) };
+    };
+    if (meter !== 'v') {
+      const a = utilPickReading(all, from, 'from'), b = utilPickReading(all, to, 'to');
+      if (a && b && a.e !== b.e && utilParseDate(a.e.d) < utilParseDate(b.e.d)) {
+        const s = span(a, b), kw = Math.round(b.e.k - a.e.k);
+        const cp = b.e.p || data.params;
+        // same model as the app: the later reading's prices, months = 1 for 28–31 days, else days/30
+        const st = utilCalc([{ id: 1, d: a.e.d, v: 0, k: a.e.k, p: cp }, { id: 2, d: b.e.d, v: 0, k: b.e.k, p: cp }], data.params)[0].st;
+        out.k = Object.assign(s, { kw, perDay: s.days > 0 ? kw / s.days : 0, cost: st });
+      } else out.notes.push('Za struju u tom razdoblju nema dva različita očitanja.');
+    }
+    if (meter !== 'k') {
+      const mains = all.filter(e => !e.ko);
+      const a = utilPickReading(mains, from, 'from'), b = utilPickReading(mains, to, 'to');
+      if (a && b && a.e !== b.e && utilParseDate(a.e.d) < utilParseDate(b.e.d)) {
+        const s = span(a, b), m3 = b.e.v - a.e.v;
+        const cp = b.e.p || data.params;
+        out.v = Object.assign(s, { m3, perDay: s.days > 0 ? m3 / s.days : 0, cost: m3 * (cp.c_m3_v || 0) + (cp.fix_v || 0) * utilMonths(a.e.d, b.e.d) });
+      } else out.notes.push('Za vodu u tom razdoblju nema dva obračunska očitanja (kontrolna nemaju vodu).');
+    }
+    // every reading between the earliest and latest date involved
+    const ds = [from, to, ...[out.k, out.v].filter(Boolean).flatMap(x => [utilParseDate(x.a.e.d), utilParseDate(x.b.e.d)])];
+    const lo = Math.min(...ds.map(Number)), hi = Math.max(...ds.map(Number));
+    out.rows = all.filter(e => { const t = +utilParseDate(e.d); return t >= lo && t <= hi; });
+    return out;
+  }
+  function utilRangeReply(data, from, to, meter) {
+    const r = utilRange(data, from, to, meter);
+    const kindHr = e => e.ko ? 'kontrolno' : 'obračunsko';
+    const parts = [], model = [];
+    let body = utilRow('Traženo', `${utilHrFromDate(r.from)} → ${utilHrFromDate(r.to)}`);
+    if (r.k) {
+      const k = r.k;
+      body += `<div class="util-sep"></div>`
+        + utilRow('⚡ Od', `${k.a.e.d} · ${numHr(k.a.e.k)} kWh · ${kindHr(k.a.e)}`)
+        + utilRow('⚡ Do', `${k.b.e.d} · ${numHr(k.b.e.k)} kWh · ${kindHr(k.b.e)}`)
+        + utilRow('⚡ Potrošeno', `${numHr(k.kw)} kWh · ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')} · ${numHr(k.perDay, 1)} kWh/dan`)
+        + utilRow('Procjena troška struje', eur(k.cost), 'util-total');
+      const sub = [];
+      if (k.a.off) sub.push(`za ${hrDateSpoken(utilHrFromDate(r.from))} nema očitanja, pa sam uzeo ono od ${hrDateSpoken(k.a.e.d)}`);
+      if (k.b.off) sub.push(`za ${hrDateSpoken(utilHrFromDate(r.to))} nema očitanja, pa sam uzeo ono od ${hrDateSpoken(k.b.e.d)}`);
+      parts.push(`Od ${hrDateSpoken(k.a.e.d)} do ${hrDateSpoken(k.b.e.d)} potrošeno je ${numHr(k.kw)} kilovatsati struje u ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')}, oko ${numHr(k.perDay, 1)} na dan, procjena troška ${eur(k.cost)}.`
+        + (sub.length ? ' Napomena: ' + sub.join('; ') + '.' : ''));
+      model.push(`Electricity: ${k.a.e.d} (${kindHr(k.a.e)}) ${k.a.e.k} kWh → ${k.b.e.d} (${kindHr(k.b.e)}) ${k.b.e.k} kWh = ${k.kw} kWh in ${k.days} days (${k.perDay.toFixed(1)} kWh/day), estimated electricity cost ${k.cost.toFixed(2)} € (prices of the later reading, HEP model as in the utilities app).${k.a.off || k.b.off ? ' Readings used are the nearest to the asked dates.' : ''}`);
+    }
+    if (r.v) {
+      const v = r.v;
+      body += `<div class="util-sep"></div>`
+        + utilRow('💧 Od', `${v.a.e.d} · ${numHr(v.a.e.v)} m³`)
+        + utilRow('💧 Do', `${v.b.e.d} · ${numHr(v.b.e.v)} m³`)
+        + utilRow('💧 Potrošeno', `${numHr(v.m3)} m³ · ${v.days} ${plural(v.days, 'dan', 'dana', 'dana')}`)
+        + utilRow('Procjena troška vode', eur(v.cost), 'util-total');
+      parts.push(`Vode od ${hrDateSpoken(v.a.e.d)} do ${hrDateSpoken(v.b.e.d)}: ${numHr(v.m3)} kubika, ${eur(v.cost)}.`);
+      model.push(`Water (billing readings only): ${v.a.e.d} ${v.a.e.v} m³ → ${v.b.e.d} ${v.b.e.v} m³ = ${v.m3} m³ in ${v.days} days, cost ${v.cost.toFixed(2)} €.`);
+    }
+    if (!r.k && !r.v) parts.push(r.notes.join(' ') || 'Za to razdoblje nema očitanja.');
+    else if (r.notes.length && meter === 'both') model.push(r.notes.join(' '));
+    if (r.rows.length) {
+      const rows = r.rows.slice(-40).map(e => `<tr><td>${escapeHtml(e.d)}</td><td>${e.ko ? 'kontrolno' : 'obračunsko'}</td><td>${e.ko ? '—' : numHr(e.v)}</td><td>${numHr(e.k)}</td></tr>`).join('');
+      body += `<div class="util-sep"></div><div class="rz-scroll"><table class="util-table"><tr><th>Datum</th><th>Vrsta</th><th>Voda m³</th><th>Struja kWh</th></tr>${rows}</table></div>`;
+      model.push('All readings in this range (date, type, water m³, electricity kWh): ' + r.rows.map(e => `${e.d} ${e.ko ? 'control' : 'billing'} ${e.ko ? '-' : e.v} ${e.k}`).join('; ') + '.');
+    }
+    utilCard(null, 'POTROŠNJA', body, [], '📈');
+    return { spoken: parts.join(' '), model: model.join('\n') + '\n(A card with these numbers and the readings is shown; say the result in one or two sentences.)' };
+  }
+
+  // ---------- Dates in spoken Croatian ----------
+  const HR_MONTH_STEMS = [['sijec', 'januar', 'sijecanj'], ['veljac', 'februar'], ['ozuj', 'mart'], ['trav', 'april'], ['svib', 'maj'], ['lip', 'jun'],
+    ['srp', 'jul'], ['kolovoz', 'august', 'avgust'], ['ruj', 'septemb'], ['listopad', 'oktob'], ['studen', 'novemb'], ['prosin', 'decemb']];
+  function hrMonthIndex(word) {
+    const w = String(word || '').toLowerCase();
+    return HR_MONTH_STEMS.findIndex(stems => stems.some(s => w.startsWith(s)));
+  }
+  // One date phrase → { dt, monthOnly } (normText-ed input: no diacritics). Year: current, or the
+  // previous one if the date would be in the future.
+  function parseHrDatePhrase(p, now) {
+    now = now || new Date();
+    p = p.trim().replace(/[.,]+$/, '');
+    if (/^(danas|sada|sad|dana?snj\w*)$/.test(p)) return { dt: utilDateOnly(now) };
+    if (/^jucer$/.test(p)) return { dt: utilDateOnly(new Date(now.getTime() - 86400000)) };
+    let m = /^(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(\d{4})?\.?$/.exec(p);
+    let d, mo, y;
+    if (m) { d = +m[1]; mo = +m[2] - 1; y = m[3] ? +m[3] : null; }
+    else if ((m = /^(\d{1,2})\s*\.?\s+([a-z]+)\s*(\d{4})?\.?$/.exec(p)) && hrMonthIndex(m[2]) >= 0) { d = +m[1]; mo = hrMonthIndex(m[2]); y = m[3] ? +m[3] : null; }
+    else if ((m = /^(?:pocetka\s+)?([a-z]+)\s*(\d{4})?\.?$/.exec(p)) && hrMonthIndex(m[1]) >= 0) { d = 1; mo = hrMonthIndex(m[1]); y = m[2] ? +m[2] : null; }
+    else return null;
+    if (mo < 0 || mo > 11 || d < 1 || d > 31) return null;
+    let dt = new Date(y || now.getFullYear(), mo, d);
+    if (!y && dt > utilDateOnly(new Date(now.getTime() + 86400000))) dt = new Date(now.getFullYear() - 1, mo, d);
+    return { dt };
+  }
+  // "koliko sam potrošio struje od 4. do 9. studenog", "potrošnja vode od rujna do danas",
+  // "razlika struje između 1.9. i 1.11."
+  function matchMeterRangeIntent(text, now) {
+    const x = normText(text).replace(/[?!]+$/, '').replace(/\s+/g, ' ').trim();
+    if (!/(potros|razlik|koliko|potrosnj|utros)/.test(x)) return null;
+    const water = /\b(voda|vode|vodu|vodi|kubik\w*|m3)\b/.test(x), power = /\b(struj\w*|kwh|kilovat\w*)\b/.test(x);
+    if (!water && !power && !/\b(rezij\w*|brojil\w*|ocitanj\w*)\b/.test(x)) return null;
+    const meter = water && !power ? 'v' : power && !water ? 'k' : 'both';
+    let m = /\bod\s+(.+?)\s+do\s+(.+?)$/.exec(x) || /\bizmedu\s+(.+?)\s+i\s+(.+?)$/.exec(x) || /\bizmedju\s+(.+?)\s+i\s+(.+?)$/.exec(x);
+    let a, b;
+    if (m) {
+      const tail = s => s.replace(/\s+(struj\w*|vod\w*|kwh|kubik\w*|m3|godine)\b.*$/, '').trim();
+      a = parseHrDatePhrase(tail(m[1]), now); b = parseHrDatePhrase(tail(m[2]), now);
+      // "od 4. do 9. studenog": the month written only once belongs to both dates
+      if (!a && /^\d{1,2}\s*\.?$/.test(tail(m[1])) && b) a = { dt: new Date(b.dt.getFullYear(), b.dt.getMonth(), parseInt(m[1], 10)) };
+    } else if ((m = /\bod\s+(.+?)$/.exec(x))) {
+      a = parseHrDatePhrase(m[1].replace(/\s+(struj\w*|vod\w*)\b.*$/, ''), now); b = { dt: utilDateOnly(now || new Date()) };
+    } else return null;
+    if (!a || !b) return null;
+    if (a.dt > b.dt) a = { dt: new Date(a.dt.getFullYear() - 1, a.dt.getMonth(), a.dt.getDate()) };
+    return { from: a.dt, to: b.dt, meter };
+  }
+  async function voiceMeterRange(userText, q, lang) {
+    addMessage('user', userText);
+    state.processing = true; setState('thinking'); updateMic();
+    let msg;
+    try { msg = utilRangeReply(await utilLoad(true), q.from, q.to, q.meter).spoken; }
+    catch (e) { msg = 'Očitanja nije moguće učitati: ' + e.message; }
+    state.processing = false; setState('idle'); updateMic();
+    await localReply(userText, msg, lang, true);
+  }
+
   // Asks for the delete password, then removes one entry. Returns true if deleted.
   async function utilDeleteEntry(entry) {
     const ok = await requirePassword(entry.ko
@@ -6033,6 +6201,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (routeVoiceIntents(t, lang)) return;
     const cloudIntent = matchCloudIntent(t);
     if (cloudIntent) { voiceCloud(t, cloudIntent, lang); return; }
+    const meterRange = utilConfigured() ? matchMeterRangeIntent(t) : null;
+    if (meterRange) { voiceMeterRange(t, meterRange, lang); return; }
     const meterState = utilConfigured() ? matchMeterStateIntent(t) : null;
     if (meterState) { voiceMeterState(t, meterState, lang); return; }
     const panel = rezijePanelIntent(t);
@@ -6580,6 +6750,14 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         case 'capture_meter_photo':
           pendingMeterCapture = { hint: toolUse.input.meter === 'water' ? 'v' : toolUse.input.meter === 'electricity' ? 'k' : null, ko: toolUse.input.control === true };
           return 'The camera opens right after you finish speaking. Say only one short sentence, e.g. "Otvaram kameru."';
+        case 'get_meter_history': {
+          const i = toolUse.input || {};
+          const iso = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+          const from = iso(i.from), to = i.to ? iso(i.to) : new Date();
+          if (!from || !to) return 'Dates must be YYYY-MM-DD.';
+          const data = await utilLoad(true);
+          return utilRangeReply(data, from, to, i.meter === 'electricity' ? 'k' : i.meter === 'water' ? 'v' : 'both').model;
+        }
         case 'get_meter_status': {
           const i = toolUse.input || {};
           const data = await utilLoad(true);
