@@ -766,6 +766,7 @@
     </div>
     <div class="topbar-right">
       <button class="icon-btn" id="rezijeBtn" title="Režije">⌂</button>
+      <button class="icon-btn icon-btn-small" id="exportBtn" title="Izvezi razgovor" aria-label="Izvezi razgovor">⇪</button>
       <button class="icon-btn icon-btn-small" id="clearBtn" title="Clear conversation">⟲</button>
       <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
     </div>
@@ -1359,7 +1360,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.1';
+  const JARVIS_VERSION = '10.2';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1411,7 +1412,9 @@ Tools available:
 - add_route_stop — add a stop to the route already on screen ("dodaj usput najbližu benzinsku").
 - start_navigation — start turn-by-turn navigation in Google Maps for the route on screen.
 - show_ideas — show the ideas notebook (saved upgrade ideas) on screen.
-- open_gallery — the user wants to load, pick or analyse a photo from the phone's gallery. The phone only opens the gallery after a tap, so this shows a card with an "Odaberi sliku" button; tell the user to tap it.
+- get_current_location — "gdje sam", the user's address, or anything that needs where the user is now (weather here, nearby). To send the location to someone, pass the returned Google Maps link to send_message.
+- export_conversation — export / share / save this conversation as a file.
+- open_gallery — the user wants to load, pick, analyse or SEND a photo from the phone's gallery (purpose "share" + contact to send it to someone). The phone only opens the gallery after a tap, so this shows a card with an "Odaberi sliku" button; tell the user to tap it.
 Never say a meter reading or price has been saved unless a tool result explicitly says it was saved.
 You cannot change your own code, layout, fonts or features. The ONLY things about yourself you can change are the options of change_setting. If the user asks for any other change to you or your interface, say plainly that you cannot do that yourself and ask whether to save it as an idea for a future upgrade (in Croatian: "Želiš li da to zapišem kao novu ideju?"); if they agree, call save_idea. Never claim a change that a tool did not confirm.
 
@@ -1783,7 +1786,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         type: 'object',
         properties: {
           destination: { type: 'string', description: 'Where the user wants to go, nominative case with the town if known (e.g. "Riva, Split"). May also be a kind of place, e.g. "najbliža ljekarna".' },
-          origin: { type: 'string', description: 'Only if the user explicitly named a start (e.g. "od Kaštela do Trogira" → "Kaštela"). Omit to start from the current location.' },
+          origin: { type: 'string', description: 'Only if the user explicitly named a different start (e.g. "od Kaštela do Trogira" → "Kaštela"). Omit it when the user says "od trenutne lokacije", "odavde", "od mene" or names no start: Jarvis then uses the phone\'s GPS location.' },
           stops: { type: 'array', items: { type: 'string' }, description: 'Optional stops on the way, in order, e.g. ["najbliža benzinska", "najbliži dućan", "Kaštel Sućurac"].' },
           travel_mode: { type: 'string', enum: ['driving', 'walking', 'bicycling', 'transit'], description: 'Default driving.' }
         },
@@ -1809,8 +1812,21 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       description: 'Show a card with an "Odaberi sliku" button that opens the phone\'s photo gallery. After the user picks a photo, Jarvis describes it, reads it as a document or receipt, saves a warranty, or reads a utility meter.',
       input_schema: {
         type: 'object',
-        properties: { purpose: { type: 'string', enum: ['scene', 'document', 'warranty', 'meter'], description: 'What to do with the photo, if the user said it: describe, read a document/receipt, save a warranty, read a meter.' } }
+        properties: {
+          purpose: { type: 'string', enum: ['scene', 'document', 'warranty', 'meter', 'share'], description: 'What to do with the photo, if the user said it: describe, read a document/receipt, save a warranty, read a meter, or share/send it to someone.' },
+          contact: { type: 'string', description: 'For share: the person the photo is for, if named.' }
+        }
       }
+    },
+    {
+      name: 'get_current_location',
+      description: 'The phone\'s current GPS location with street address, coordinates and a Google Maps link; shows a map card. Use for "gdje sam", for questions that need the user\'s location (weather here, things nearby), or to send the location to someone (pass the link to send_message).',
+      input_schema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'export_conversation',
+      description: 'Export the conversation shown on screen as a text file and open Android sharing (WhatsApp, e-mail…) or save it. Shows a card with Podijeli / Spremi / Kopiraj.',
+      input_schema: { type: 'object', properties: {} }
     },
     {
       name: 'show_ideas',
@@ -5157,6 +5173,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       img('Pročitaj dokument', g ? 'Pročitaj dokument sa slike.' : 'Pročitaj podijeljeni dokument.', 'document'),
       img('Spremi garanciju', g ? 'Spremi garanciju sa slike.' : 'Spremi garanciju s podijeljene slike.', 'warranty')];
     if (utilConfigured()) imageButtons.push(img('Očitaj brojilo', 'Očitaj brojilo sa slike.', 'meter'));
+    if (s.kind === 'image' && s.source === 'gallery') imageButtons.push({ label: '📤 Podijeli', onClick: () => shareGalleryImage(s) });
     const buttons = s.kind === 'image' ? imageButtons
       : s.kind === 'pdf' ? [{ label: 'Sažmi', onClick: () => sharedSummarizePdf(L()) }, img('Pročitaj dokument', 'Pročitaj podijeljeni PDF.', 'document'), img('Spremi garanciju', 'Spremi garanciju iz PDF-a.', 'warranty')]
       : [{ label: 'Sažmi', onClick: () => sharedAsk('Sažmi ukratko, u 3 do 5 rečenica.', '📥 Sažmi', L()) },
@@ -5214,6 +5231,14 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   function handleSharedVoice(t, lang, freeQuestion = 'named') {
     const s = sharedItem, x = normText(t);
     if (s.kind === 'image') {
+      if (/\b(posalji|podijeli|proslijedi)\s+(je|ju|nju|ovo|to|sliku|fotku|fotografiju|ovu sliku|tu sliku)\b|\b(posalji|podijeli|proslijedi)\s+\S+\s+(je|ju|sliku|fotku)\b/.test(x)) {
+        const who = shareContactFromText(t);
+        addMessage('user', t);
+        showImageShareCard(s, who && who.name);
+        if (tapIsFresh()) shareGalleryImage(s, who && who.name);
+        localReply(t, tapIsFresh() ? 'Otvaram dijeljenje slike.' : `Dodirni ${who ? 'Pošalji' : 'Podijeli'} na kartici.`, lang, true);
+        return true;
+      }
       if (/\bocitaj|brojil|vodomjer|strujomjer/.test(x)) { runImageAction('meter', t, lang); return true; }
       if (/garanc|jamstv/.test(x)) { runImageAction('warranty', t, lang); return true; }
       if (/procitaj|dokument|racun|podatk|posjetnic/.test(x)) { runImageAction('document', t, lang); return true; }
@@ -5241,9 +5266,10 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // handled exactly like a photo shared from another app (sharedItem).
   let galleryPending = null; // { mode, text, lang } — what to do once a photo is picked
   let galleryCard = null;
-  const GALLERY_MODES = { scene: 'opis', document: 'dokument / račun', warranty: 'garancija', meter: 'brojilo' };
+  const GALLERY_MODES = { scene: 'opis', document: 'dokument / račun', warranty: 'garancija', meter: 'brojilo', share: 'slanje (WhatsApp ili druga aplikacija)' };
   function galleryModeFromText(t) {
     const x = normText(t);
+    if (/\b(posalji|podijeli|proslijedi|salji)\b/.test(x)) return 'share';
     if (/brojil|vodomjer|strujomjer/.test(x)) return 'meter';
     if (/garanc|jamstv/.test(x)) return 'warranty';
     if (/racun|dokument|posjetnic|priznanic|procitaj|podatk/.test(x)) return 'document';
@@ -5308,8 +5334,17 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     catch (e) { addMessage('error', 'Sliku nije moguće učitati: ' + (e && e.message ? e.message : 'nepoznata greška')); return; }
     if (galleryCard && galleryCard.isConnected) galleryCard.remove();
     galleryCard = null;
-    sharedItem = { kind: 'image', base64, mime: 'image/jpeg', name: file.name || '', title: '', text: '', url: '', at: Date.now(), source: 'gallery', fresh: true };
+    sharedItem = { kind: 'image', base64, mime: 'image/jpeg', name: file.name || '', title: '', text: '', url: '', at: Date.now(), source: 'gallery', fresh: true, file };
     renderSharedCard();
+    if (pend.mode === 'share') {
+      sharedItem.fresh = false;
+      const who = shareContactFromText(pend.text);
+      showImageShareCard(sharedItem, who && who.name);
+      const q = who ? `Slika je spremna. Dodirni Pošalji, pa u WhatsAppu odaberi osobu: ${who.name}.` : 'Slika je spremna. Dodirni Podijeli, pa odaberi aplikaciju i osobu.';
+      addMessage('assistant', q);
+      if (!state.speaking && !state.processing && !state.recognizing) await speak(q, pend.lang);
+      return;
+    }
     if (pend.mode) { runImageAction(pend.mode, pend.text, pend.lang); return; }
     const q = 'Učitao sam sliku. Što da napravim s njom?';
     addMessage('assistant', q);
@@ -5599,6 +5634,15 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   ];
   const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
   const HERE_RE = /^(mene|sebe|ovdje|ovuda|odavde|tu|moje\s+(trenutne\s+)?lokacije|trenutne\s+lokacije|moje\s+pozicije|mjesta\s+gdje\s+sam(\s+sada?)?|ovog\s+mjesta|here|my\s+(current\s+)?location|current\s+location|trenutna\s+lokacija|moja\s+lokacija)$/i;
+  // "trenutne lokacije", "moje pozicije", "mjesta gdje se nalazim", "odavde", "current location"…
+  function isHerePhrase(s) {
+    const x = normText(s).replace(/[.,!?]+$/, '').replace(/^(od|from)\s+/, '').trim();
+    return HERE_RE.test(x)
+      || /^(mene|sebe|ovdje|ovuda|odavde|odavdje|tu|ovog mjesta|ovdje gdje sam|here|me)$/.test(x)
+      || /^(?:(?:moj\w*|nas\w*|my|the)\s+)?(?:(?:trenutn\w*|sadasnj\w*|aktualn\w*|current|gps|live)\s+)*(?:lokacij\w*|pozicij\w*|polozaj\w*|location|position)(?:\s+(?:gdje|di)\s+(?:se\s+)?(?:sam|nalazim)(?:\s+sada?|\s+trenutno)?)?$/.test(x)
+      || /^(?:(?:ovog\s+)?mjest\w*\s+)?(?:gdje|di)\s+(?:se\s+)?(?:sam|nalazim|stojim)(?:\s+sada?|\s+trenutno)?$/.test(x)
+      || /^(?:the\s+)?user'?s\s+(?:current\s+)?(?:gps\s+)?location$/.test(x);
+  }
   let activeRoute = null; // { origin, dest, stops, mode, stats, line, at, card, hereError }
   let lastHere = null;    // { lat, lng, acc, at }
   let routeHintGiven = false;
@@ -5925,7 +5969,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // req: { from: null | 'here' | place, to: place or "najbliža benzinska", stops: [..], mode }
   async function planRoute(req, existingCard) {
     const mode = ROUTE_MODES[req.mode] ? req.mode : 'driving';
-    const fromText = req.from && !HERE_RE.test(String(req.from).trim()) ? String(req.from).trim() : null;
+    const fromText = req.from && req.from !== 'here' && !isHerePhrase(String(req.from)) ? String(req.from).trim() : null;
     const toText = String(req.to || '').trim();
     if (!toText) return { error: 'Reci mi kamo želiš ići.' };
     const here = await getHere();
@@ -5987,8 +6031,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   }
 
   // ---------- Voice flows ----------
-  async function routeBusyRun(userText, lang, work) {
-    addMessage('user', userText);
+  async function routeBusyRun(userText, lang, work, userShown) {
+    if (!userShown) addMessage('user', userText);
     stopWakeWordListening();
     state.processing = true; setState('thinking'); updateMic();
     let out;
@@ -6000,13 +6044,14 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   }
   function voicePlanRoute(userText, req, lang) {
     if (state.processing) return;
-    const card = utilCard(null, 'RUTA', `<div class="util-done">⏳ ${req.from && !HERE_RE.test(req.from) ? 'Tražim mjesta i računam rutu…' : 'Određujem tvoju lokaciju i računam rutu…'}</div>`, [], '⌖');
+    addMessage('user', userText); // the question first, then the card under it
+    const card = utilCard(null, 'RUTA', `<div class="util-done">⏳ ${req.from && req.from !== 'here' && !isHerePhrase(req.from) ? 'Tražim mjesta i računam rutu…' : 'Određujem tvoju lokaciju i računam rutu…'}</div>`, [], '⌖');
     card.classList.add('card-route');
     return routeBusyRun(userText, lang, async () => {
       const out = await planRoute(req, card);
       if (out.error) utilFinalizeCard(card, 'RUTA', out.error);
       return out;
-    });
+    }, true);
   }
   function voiceRouteStop(userText, stopText, lang, route) {
     if (state.processing || state.recognizing) return;
@@ -6071,7 +6116,11 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     else if ((m = /^(?:do|to|prema|za|towards|na|u)\s+(.+?)\s+(?:od|from)\s+(.+)$/i.exec(rest))) { to = m[1]; from = m[2]; }
     else if ((m = /^(?:do|to|prema|za|towards|na|u)\s+(.+)$/i.exec(rest))) { to = m[1]; }
     if (!to) return null;
-    if (from && HERE_RE.test(from.trim())) from = 'here';
+    // "do lokacije Trogir", "do adrese Ilica 5" → the place itself
+    const placeWord = /^(?:lokacij\w*|adres\w*|odredist\w*|odredišt\w*|mjesta)\s+(?=\S)/i;
+    to = to.replace(placeWord, '');
+    if (from) from = from.replace(placeWord, '');
+    if (from && isHerePhrase(from)) from = 'here';
     return { from, to };
   }
   function matchRouteIntent(text) {
@@ -6095,6 +6144,14 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       const sp = splitRouteStops(ft.to);
       if (!sp.dest) continue;
       return { from: ft.from, to: sp.dest, stops: sp.stops, mode: mm.mode };
+    }
+    // Bare "od trenutne lokacije do Trogira", "odavde do Trogira" — only when the start is "here".
+    if (/^(?:od|odavde|odavdje|from)\b/i.test(x)) {
+      const ft = parseFromTo(x);
+      if (ft && ft.from === 'here' && ft.to.length <= 120) {
+        const sp = splitRouteStops(ft.to);
+        if (sp.dest) return { from: 'here', to: sp.dest, stops: sp.stops, mode: mm.mode };
+      }
     }
     return null;
   }
@@ -6150,6 +6207,184 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     return false;
   }
 
+  // ---------- "Gdje sam?" — current location with an address ----------
+  async function reverseGeocode(lat, lng) {
+    try {
+      const j = await fetchJsonTimeout(`https://photon.komoot.io/reverse?lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}&limit=1`, {}, 8000);
+      const p = j && j.features && j.features[0] && j.features[0].properties;
+      if (p) {
+        const street = [p.street || (p.osm_key === 'highway' ? p.name : ''), p.housenumber].filter(Boolean).join(' ');
+        const place = p.city || p.town || p.village || p.district || p.county || '';
+        const label = [street || (p.name && p.osm_key !== 'highway' ? p.name : ''), p.district && p.district !== place ? p.district : '', place].filter(Boolean);
+        if (label.length) return [...new Set(label)].join(', ');
+      }
+    } catch (e) {}
+    try {
+      const j = await fetchJsonTimeout(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=hr&lat=${lat.toFixed(6)}&lon=${lng.toFixed(6)}`, {}, 8000);
+      const a = j && j.address;
+      if (a) {
+        const street = [a.road, a.house_number].filter(Boolean).join(' ');
+        const place = a.city || a.town || a.village || a.suburb || a.county || '';
+        const label = [street, a.suburb && a.suburb !== place ? a.suburb : '', place].filter(Boolean);
+        if (label.length) return [...new Set(label)].join(', ');
+      }
+      if (j && j.display_name) return String(j.display_name).split(',').slice(0, 3).map(x => x.trim()).join(', ');
+    } catch (e) {}
+    return '';
+  }
+  function mapsLinkFor(lat, lng) { return `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lng.toFixed(6)}`; }
+  async function currentLocationInfo() {
+    const here = await getHere();
+    if (here.error) return { error: here.error };
+    const address = await reverseGeocode(here.lat, here.lng);
+    return { lat: here.lat, lng: here.lng, acc: here.acc, address, link: mapsLinkFor(here.lat, here.lng) };
+  }
+  function renderLocationCard(info) {
+    const body = `<iframe class="route-map" src="${escapeHtml(`https://maps.google.com/maps?q=${info.lat.toFixed(6)},${info.lng.toFixed(6)}&z=16&output=embed`)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Karta lokacije"></iframe>`
+      + utilRow('Adresa', info.address || 'nepoznata (vidi kartu)')
+      + utilRow('Koordinate', `${info.lat.toFixed(5)}, ${info.lng.toFixed(5)}${info.acc ? ` · ±${Math.round(info.acc)} m` : ''}`);
+    const card = utilCard(null, 'MOJA LOKACIJA', body, [
+      { label: '📤 Podijeli lokaciju', cls: 'util-save', onClick: () => shareOrCopy({ title: 'Moja lokacija', text: `${info.address ? info.address + ' — ' : ''}${info.link}` }, 'Poveznica na lokaciju kopirana.') },
+      { label: 'Otvori u Kartama', onClick: () => openExternal(info.link) },
+    ], '📍');
+    card.classList.add('card-route');
+    return card;
+  }
+  function isWhereAmIIntent(t) {
+    const x = normText(t).replace(/[.!?]+$/, '');
+    return /^(?:reci mi\s+|pokazi mi\s+|pokaži mi\s+)?(?:gdje|di)\s+(?:sam|se nalazim|smo)(?:\s+(?:sada?|trenutno|tocno))?$/.test(x)
+      || /^(?:koja je|kakva je|pokazi|prikazi|daj mi)?\s*(?:moja\s+|mi\s+)?(?:trenutna\s+|tocna\s+)?(?:lokacija|adresa|pozicija)(?:\s+(?:sada|trenutno))?$/.test(x)
+      || /^(?:where am i|what'?s my location|my location)$/.test(x);
+  }
+  async function voiceWhereAmI(userText, lang) {
+    addMessage('user', userText);
+    state.processing = true; setState('thinking'); updateMic();
+    let msg;
+    try {
+      const info = await currentLocationInfo();
+      if (info.error) msg = info.error;
+      else { renderLocationCard(info); msg = info.address ? `Nalaziš se na adresi ${info.address}.` : 'Lokacija je na karti, ali adresu nisam uspio odrediti.'; }
+    } catch (e) { msg = 'Lokaciju nije moguće odrediti: ' + e.message; }
+    state.processing = false; setState('idle'); updateMic();
+    await localReply(userText, msg, lang, true);
+  }
+
+  // ---------- Sharing (Android "Dijeli") ----------
+  // Browsers open the share sheet only right after a tap, so voice commands use it when
+  // the mic tap is still fresh and otherwise leave a card with a button.
+  function tapIsFresh() { const ua = navigator.userActivation; return !ua || ua.isActive; }
+  function canShareFiles(files) {
+    try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files })); } catch { return false; }
+  }
+  async function shareOrCopy(data, copiedMsg) {
+    try {
+      if (navigator.share && (!data.files || canShareFiles(data.files))) { await navigator.share(data); return 'shared'; }
+    } catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+    if (data.files && data.files[0]) { downloadFile(data.files[0]); return 'downloaded'; }
+    try { await navigator.clipboard.writeText([data.text, data.url].filter(Boolean).join('\n')); addMessage('assistant', copiedMsg || 'Kopirano.'); return 'copied'; }
+    catch { return 'failed'; }
+  }
+  function downloadFile(file) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  // ---------- A2: export the conversation ----------
+  function conversationText() {
+    const lines = [];
+    const now = new Date();
+    lines.push(`J.A.R.V.I.S. — razgovor, izvezeno ${utilHrFromDate(now)} u ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    lines.push('');
+    let count = 0;
+    for (const el of transcript.children) {
+      if (el.classList.contains('msg')) {
+        if (el.classList.contains('msg-interim')) continue;
+        const text = (el.querySelector('.msg-text') || {}).textContent || '';
+        if (!text.trim()) continue;
+        const who = el.classList.contains('msg-user') ? 'Ti' : el.classList.contains('msg-error') ? 'Greška' : 'Jarvis';
+        lines.push(`${who}: ${text.trim()}`); lines.push(''); count++;
+      } else if (el.classList.contains('card')) {
+        const head = (el.querySelector('.card-header') || {}).textContent || '';
+        if (el.classList.contains('card-export')) continue;
+        const rows = [...el.querySelectorAll('.util-row')].map(r => {
+          const l = (r.querySelector('.util-l') || {}).textContent || '', v = (r.querySelector('.util-v') || {}).textContent || '';
+          return `   ${l.trim()}${v.trim() ? ': ' + v.trim() : ''}`;
+        });
+        const links = [...el.querySelectorAll('a[href^="http"]')].map(a => `   ${a.getAttribute('href')}`);
+        const done = [...el.querySelectorAll('.util-done, .idea-row, .shop-item')].map(x => `   ${x.textContent.replace(/\s+/g, ' ').trim()}`);
+        const block = [`[${head.replace(/\s+/g, ' ').trim() || 'Kartica'}]`, ...rows, ...done, ...links];
+        lines.push(block.join('\n')); lines.push('');
+      }
+    }
+    return { text: lines.join('\n').trim() + '\n', count };
+  }
+  function conversationFile() {
+    const { text, count } = conversationText();
+    const n = new Date(), p = v => String(v).padStart(2, '0');
+    const name = `jarvis-razgovor-${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}-${p(n.getHours())}${p(n.getMinutes())}.txt`;
+    return { file: new File([text], name, { type: 'text/plain' }), text, count };
+  }
+  async function shareConversation() {
+    const { file, text } = conversationFile();
+    if (canShareFiles([file])) return shareOrCopy({ files: [file], title: 'Razgovor s Jarvisom' });
+    if (navigator.share) { try { await navigator.share({ title: 'Razgovor s Jarvisom', text }); return 'shared'; } catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; } }
+    downloadFile(file); return 'downloaded';
+  }
+  function showExportCard() {
+    const { file, count } = conversationFile();
+    const card = utilCard(null, 'IZVOZ RAZGOVORA', utilRow('Poruka', String(count)) + utilRow('Datoteka', file.name)
+      + '<div class="route-note">Podijeli šalje datoteku u WhatsApp, e-poštu ili drugu aplikaciju. Spremi je sprema u Preuzimanja.</div>', [
+      { label: '📤 Podijeli', cls: 'util-save', onClick: () => shareConversation() },
+      { label: '⬇ Spremi', onClick: () => downloadFile(conversationFile().file) },
+      { label: 'Kopiraj', onClick: async (e) => { const b = e.currentTarget; try { await navigator.clipboard.writeText(conversationText().text); b.textContent = 'Kopirano ✓'; } catch { b.textContent = 'Nije uspjelo'; } } },
+    ], '📤');
+    card.classList.add('card-export');
+    return { card, count };
+  }
+  function isExportIntent(t) {
+    const x = normText(t).replace(/[.!?]+$/, '');
+    return /^(?:izvezi|izvoz|podijeli|posalji|spremi|exportaj|export|share)\s+(?:mi\s+)?(?:ovaj\s+|cijeli\s+|nas\s+|danasnji\s+)?(?:razgovor|chat|konverzaciju)(?:\s+(?:u datoteku|kao datoteku|na whatsapp|preko whatsappa|u whatsapp))?$/.test(x)
+      || /^(?:izvoz|export)\s+razgovora$/.test(x);
+  }
+  async function voiceExport(userText, lang) {
+    const fresh = tapIsFresh();
+    addMessage('user', userText);
+    const { count } = showExportCard();
+    let msg;
+    if (!count) msg = 'Razgovor je prazan.';
+    else if (fresh) { shareConversation(); msg = 'Otvaram dijeljenje razgovora.'; }
+    else msg = 'Razgovor je spreman. Dodirni Podijeli ili Spremi.';
+    await localReply(userText, msg, lang, true);
+  }
+
+  // ---------- A3: send a gallery photo to someone ----------
+  function shareContactFromText(t) {
+    const x = normText(t);
+    const stop = new Set(['sliku', 'fotku', 'fotografiju', 'iz', 'galerije', 'galerija', 'mi', 'na', 'whatsapp', 'preko', 'whatsappa', 'jednu', 'tu', 'ovu', 'moju', 'za', 'posalji', 'podijeli', 'proslijedi', 'salji', 'sa', 's', 'albuma', 'mobitela', 'telefona', 'i', 'od', 'neku', 'svoju']);
+    const words = x.replace(/[.,!?]/g, ' ').split(/\s+/).filter(w => w && !stop.has(w));
+    for (const w of words) { const c = findContactByName(w); if (c) return { name: c.name, contact: c }; }
+    const m = /\bza\s+(\S+)/.exec(x) || /(?:posalji|podijeli|proslijedi)\s+(\S+)\s+(?:sliku|fotku|fotografiju)/.exec(x);
+    if (m && !stop.has(m[1])) return { name: capitalizeWords(m[1]), contact: null };
+    return null;
+  }
+  async function shareGalleryImage(item, who) {
+    const file = item.file || (item.base64 ? new File([Uint8Array.from(atob(item.base64), c => c.charCodeAt(0))], 'slika.jpg', { type: 'image/jpeg' }) : null);
+    if (!file) return 'failed';
+    if (!canShareFiles([file])) { downloadFile(file); addMessage('assistant', 'Ovaj preglednik ne može dijeliti slike, pa sam je spremio u Preuzimanja.'); return 'downloaded'; }
+    return shareOrCopy({ files: [file], title: who ? `Slika za ${who}` : 'Slika' });
+  }
+  function showImageShareCard(item, who) {
+    const btn = who ? `📤 Pošalji — ${who}` : '📤 Podijeli';
+    const body = `<img src="data:image/jpeg;base64,${item.base64}" alt="Slika za slanje" style="width:100%;max-height:260px;object-fit:contain;background:#000;display:block;margin-bottom:6px;">`
+      + `<div class="route-note">Dodirni ${escapeHtml(btn.replace('📤 ', ''))}, zatim u izborniku odaberi WhatsApp${who ? ` i ${escapeHtml(who)}` : ''}. (Preglednik ne može sam izabrati osobu u WhatsAppu.)</div>`;
+    return utilCard(null, who ? `SLIKA ZA: ${who.toUpperCase()}` : 'PODIJELI SLIKU', body, [
+      { label: btn, cls: 'util-save', onClick: () => shareGalleryImage(item, who) },
+    ], '📤');
+  }
+
   // ---------- Single entry point for every recognised utterance ----------
   function rezijePanelIntent(text) {
     const t = (text || '').toLowerCase().trim().replace(/[.!?]+$/, '');
@@ -6198,6 +6433,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const settingIntent = matchSettingIntent(t);
     if (settingIntent) { voiceApplySetting(t, settingIntent, lang); return; }
     if (routeHouseholdIntents(t, lang)) return;
+    if (isWhereAmIIntent(t)) { voiceWhereAmI(t, lang); return; }
+    if (isExportIntent(t)) { voiceExport(t, lang); return; }
     if (routeVoiceIntents(t, lang)) return;
     const cloudIntent = matchCloudIntent(t);
     if (cloudIntent) { voiceCloud(t, cloudIntent, lang); return; }
@@ -6697,9 +6934,19 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
           return 'Google Maps navigation opens right after your sentence.';
         }
         case 'open_gallery': {
-          const mode = ['scene', 'document', 'warranty', 'meter'].includes(toolUse.input && toolUse.input.purpose) ? toolUse.input.purpose : null;
-          showGalleryCard(mode, '', currentLang());
+          const mode = ['scene', 'document', 'warranty', 'meter', 'share'].includes(toolUse.input && toolUse.input.purpose) ? toolUse.input.purpose : null;
+          showGalleryCard(mode, toolUse.input && toolUse.input.contact ? `za ${toolUse.input.contact}` : '', currentLang());
           return 'Gallery card shown. The user must tap "Odaberi sliku" to open the gallery (phones only open it after a tap). Say that in one short sentence.';
+        }
+        case 'get_current_location': {
+          const info = await currentLocationInfo();
+          if (info.error) return 'Location NOT available: ' + info.error;
+          renderLocationCard(info);
+          return `Current location: ${info.address || 'address unknown'} (lat ${info.lat.toFixed(5)}, lng ${info.lng.toFixed(5)}, accuracy ±${Math.round(info.acc || 0)} m). Google Maps link: ${info.link}. A map card is shown.`;
+        }
+        case 'export_conversation': {
+          const { count } = showExportCard();
+          return count ? 'Export card shown; the user taps Podijeli (share to WhatsApp etc.) or Spremi (save the .txt file). Say that in one short sentence.' : 'The conversation is empty.';
         }
         case 'show_ideas': {
           const n = loadIdeas().length;
@@ -7834,7 +8081,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // search) must NEVER replay here — that would re-fire a search, create
   // duplicate calendar events, etc.
   const REPLAYABLE_TOOLS = new Set(['show_map', 'show_youtube', 'show_link']);
-  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message', 'start_navigation', 'show_ideas', 'open_gallery']);
+  const NO_FOLLOWUP_TOOLS = new Set(['show_map', 'show_youtube', 'show_link', 'capture_meter_photo', 'open_utilities_app', 'make_phone_call', 'send_message', 'start_navigation', 'show_ideas', 'open_gallery', 'export_conversation']);
 
   function rehydrateHistory() {
     if (!state.history.length) return;
@@ -7878,6 +8125,10 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       handleCameraRequest('', lang, { mode: 'scene' });
     });
   })();
+  $('exportBtn').addEventListener('click', () => {
+    const { count } = showExportCard();
+    if (count) shareConversation();
+  });
   $('galleryBtn').addEventListener('click', () => {
     if (state.speaking) interruptSpeech();
     openGalleryPicker(null, '', currentLang());

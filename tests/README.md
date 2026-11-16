@@ -28,6 +28,7 @@ npm test
 | `rezije-kontrolno.test.js` | Obračunska i kontrolna očitanja, "glavno stanje struje", HEP Plavi izračun, procjena od obračuna, unos i brisanje kontrolnog |
 | `cloud.test.js` | Oblak (v10): registracija i prijava, dva uređaja, spajanje pri prvom povezivanju, automatsko slanje i preuzimanje, istek prijave, API ključevi po izboru, reset ne briše oblak, odjava |
 | `rezije-povijest.test.js` | Potrošnja i trošak između bilo koja dva datuma, najbliže očitanje, voda samo iz obračunskih, isti iznos kao tablica, alat get_meter_history |
+| `share-location.test.js` | Ruta od trenutne lokacije, "gdje sam", izvoz razgovora, slika iz galerije kontaktu |
 | `route.test.js` | Rute: GPS polazak, zadani polazak, usputna stajališta, najbliže mjesto, navigacija u Google Kartama, alat plan_route |
 | `household.test.js` | Popis za kupovinu, garancije, važni datumi, dnevni podsjetnici, podijeljeni tekst/slika/PDF |
 | `sw.test.js` | Servisni program za "Podijeli s Jarvisom" |
