@@ -26,6 +26,7 @@ npm test
 | `ideas.test.js` | Bilježnica ideja, kartica s idejama, "Jarvis," ispred naredbi, broj verzije |
 | `gallery.test.js` | Slika iz galerije: tipka 🖼, glasovne naredbe, opis, dokument, garancija i brojilo bez kamere, alat open_gallery |
 | `rezije-kontrolno.test.js` | Obračunska i kontrolna očitanja, "glavno stanje struje", HEP Plavi izračun, procjena od obračuna, unos i brisanje kontrolnog |
+| `cloud.test.js` | Oblak (v10): registracija i prijava, dva uređaja, spajanje pri prvom povezivanju, automatsko slanje i preuzimanje, istek prijave, API ključevi po izboru, reset ne briše oblak, odjava |
 | `route.test.js` | Rute: GPS polazak, zadani polazak, usputna stajališta, najbliže mjesto, navigacija u Google Kartama, alat plan_route |
 | `household.test.js` | Popis za kupovinu, garancije, važni datumi, dnevni podsjetnici, podijeljeni tekst/slika/PDF |
 | `sw.test.js` | Servisni program za "Podijeli s Jarvisom" |

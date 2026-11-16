@@ -104,6 +104,10 @@
   }
   @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
   .topbar-right { display: flex; gap: 14px; align-items: center; }
+  #settingsModal [hidden], .cloud-dot[hidden] { display: none !important; }
+  .cloud-dot { font-size: 12px; margin-left: 6px; color: var(--text-dim); }
+  .cloud-dot[data-state="ok"] { color: var(--cyan, #4fd1ff); }
+  .cloud-dot[data-state="error"] { color: var(--red); }
   .icon-btn {
     background: transparent; border: 1px solid var(--border);
     color: var(--cyan); width: 32px; height: 32px;
@@ -758,6 +762,7 @@
       <div class="brand-dot"></div>
       <span>J.A.R.V.I.S.</span>
       <span class="wake-badge" id="wakeBadge" style="display:none;">👂 WAKE</span>
+      <span class="cloud-dot" id="cloudDot" hidden aria-label="Oblak">☁</span>
     </div>
     <div class="topbar-right">
       <button class="icon-btn" id="rezijeBtn" title="Režije">⌂</button>
@@ -1218,6 +1223,46 @@
       Glasom: "Jarvis, nova ideja: …" sprema ideju s datumom. "Pročitaj moje ideje" ih izgovori. "Kopiraj sve" ih stavlja u međuspremnik, spremne za lijepljenje u razgovor u kojem se Jarvis razvija.
     </div>
 
+    <h3>Oblak (privatna baza)</h3>
+    <div class="field">
+      <label for="cloudApiKeyInput">Firebase Web API ključ</label>
+      <input type="password" id="cloudApiKeyInput" autocomplete="off" placeholder="AIza…">
+      <div class="field-hint">Firebase konzola → Project settings → General → Web API Key. Sprema se samo na ovom uređaju.</div>
+    </div>
+    <div class="field">
+      <label for="cloudDbUrlInput">Adresa baze (Realtime Database)</label>
+      <input type="password" id="cloudDbUrlInput" autocomplete="off" placeholder="https://<projekt>-default-rtdb.<regija>.firebasedatabase.app">
+    </div>
+    <div class="field">
+      <label for="cloudEmailInput">Email</label>
+      <input type="email" id="cloudEmailInput" autocomplete="username" placeholder="tvoj email">
+    </div>
+    <div class="field" id="cloudPasswordField">
+      <label for="cloudPasswordInput">Lozinka</label>
+      <input type="password" id="cloudPasswordInput" autocomplete="current-password" placeholder="najmanje 6 znakova">
+      <div class="field-hint">Lozinka se ne sprema. Nakon prijave Jarvis pamti samo sigurnosni token za obnavljanje prijave.</div>
+    </div>
+    <div class="btn-row" style="margin-top:0;">
+      <button class="btn" type="button" id="cloudLoginBtn">Prijava</button>
+      <button class="btn btn-secondary" type="button" id="cloudSignupBtn">Registracija</button>
+      <button class="btn" type="button" id="cloudSyncBtn" hidden>Sinkroniziraj sada</button>
+      <button class="btn btn-secondary" type="button" id="cloudLogoutBtn" hidden>Odjava</button>
+    </div>
+    <div class="field-hint" id="cloudStatus" style="margin-top:6px;"></div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Spremaj i API ključeve u oblak</div>
+        <div class="toggle-desc">Isključeno: ključevi (Claude, Gemini, OpenAI, OpenRouter, ElevenLabs, Tavily) ostaju samo na ovom uređaju. Uključeno: novi uređaj ih dobije nakon prijave.</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="cloudWithKeysToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="info-note">
+      U oblak idu: kontakti, popis za kupovinu, garancije, važni datumi, podsjetnici, ideje, pamćenje, protokoli, troškovi i postavke (izgled, glas, modeli, veza na režije). Samo na uređaju ostaju razgovor, statistika potrošnje i Wake Word. Podaci su pod tvojim korisnikom i pravila baze nikome drugome ne daju pristup. Promjene s drugog uređaja stižu u roku od 20 sekundi ili odmah kad otvoriš Jarvisa. Glasom: "sinkroniziraj", "stanje oblaka".
+    </div>
+
     <h3>Backup</h3>
     <div class="btn-row" style="margin-top:0;">
       <button class="btn" type="button" id="exportBackupBtn">Export Backup</button>
@@ -1314,7 +1359,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '9.2';
+  const JARVIS_VERSION = '10.0';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -2197,6 +2242,359 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ==================================================================
   // STATE
   // ==================================================================
+  // ---------- Oblak: private cloud storage (Firebase Auth + Realtime Database over REST) ----------
+  // Every user has their own space /users/<uid>/ that the database rules open only to them.
+  // Each synced localStorage key is one record: /users/<uid>/data/<key> = { v, t, dev[, del] }.
+  // localStorage stays the working copy (works offline); the cloud is the durable copy that
+  // survives clearing the browser and is shared between devices. Conflicts: newest edit wins
+  // per key; on the very first link, lists from the device and the cloud are merged.
+  const CLOUD_DATA_KEYS = ['jarvis_contacts', 'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_reminders',
+    'jarvis_ideas', 'jarvis_memories', 'jarvis_protocols', 'jarvis_expenses'];
+  const CLOUD_SETTING_KEYS = ['jarvis_anthropic_model', 'jarvis_gemini_model', 'jarvis_openai_model', 'jarvis_openrouter_model',
+    'jarvis_openrouter_custom', 'jarvis_anthropic_effort', 'jarvis_auto_routing', 'jarvis_forced_provider', 'jarvis_provider_enabled',
+    'jarvis_eleven_voice', 'jarvis_pitch', 'jarvis_lang', 'jarvis_personality', 'jarvis_boot_sequence', 'jarvis_morning_briefing',
+    'jarvis_morning_prompt', 'jarvis_continuous_conv', 'jarvis_memory_retention', 'jarvis_google_client_id', 'jarvis_theme',
+    'jarvis_wa_country', 'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_app_url', 'jarvis_rezije_title'];
+  const CLOUD_SECRET_KEYS = ['jarvis_anthropic_key', 'jarvis_gemini_key', 'jarvis_openai_key', 'jarvis_openrouter_key',
+    'jarvis_eleven_key', 'jarvis_tavily_key', 'jarvis_rezije_auth'];
+  // Device-only on purpose: conversation, usage counters, wake word, last-shown dates, and the cloud login itself.
+  const CLOUD_CFG_KEY = 'jarvis_cloud', CLOUD_META_KEY = 'jarvis_cloud_meta', CLOUD_PRELINK_KEY = 'jarvis_cloud_prelink';
+  const lsSetRaw = Storage.prototype.setItem, lsRemoveRaw = Storage.prototype.removeItem;
+  let cloudCfg = (() => { try { return JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || 'null') || {}; } catch { return {}; } })();
+  let cloudMeta = (() => { try { return JSON.parse(localStorage.getItem(CLOUD_META_KEY) || 'null') || {}; } catch { return {}; } })();
+  let cloudToken = null;          // { id, exp } — Firebase ID token, memory only
+  let cloudApplying = false;      // true while writing values that came from the cloud
+  let cloudSuspended = false;     // true during "Reset All Data": never propagate a local wipe
+  let cloudTimer = null, cloudBusy = false, cloudAgain = false, cloudLastSync = 0, cloudLastError = '', cloudLastChanges = 0;
+
+  function cloudSaveCfg() { try { lsSetRaw.call(localStorage, CLOUD_CFG_KEY, JSON.stringify(cloudCfg)); } catch {} }
+  function cloudSaveMeta() { try { lsSetRaw.call(localStorage, CLOUD_META_KEY, JSON.stringify(cloudMeta)); } catch {} }
+  function cloudLinked() { return !!(cloudCfg.apiKey && cloudCfg.dbUrl && cloudCfg.uid && cloudCfg.refreshToken); }
+  function cloudKeys() { return [...CLOUD_DATA_KEYS, ...CLOUD_SETTING_KEYS, ...(cloudCfg.withKeys ? CLOUD_SECRET_KEYS : [])]; }
+  function cloudSynced(k) { return cloudKeys().includes(k); }
+  function cloudHash(s) {
+    if (s == null) return '-';
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return s.length + ':' + (h >>> 0).toString(36);
+  }
+  if (!cloudCfg.dev) { cloudCfg.dev = 'd' + Math.random().toString(36).slice(2, 10); cloudSaveCfg(); }
+
+  // Notice every local change to a synced key, wherever in Jarvis it is written.
+  Storage.prototype.setItem = function (k, v) {
+    lsSetRaw.call(this, k, v);
+    if (this === window.localStorage) cloudNoteLocalChange(k);
+  };
+  Storage.prototype.removeItem = function (k) {
+    lsRemoveRaw.call(this, k);
+    if (this === window.localStorage) cloudNoteLocalChange(k);
+  };
+  function cloudNoteLocalChange(k) {
+    if (cloudApplying || cloudSuspended || !cloudLinked() || !cloudSynced(k)) return;
+    const m = cloudMeta[k] || (cloudMeta[k] = { t: 0 });
+    if (cloudHash(localStorage.getItem(k)) === m.h) return; // same value as the cloud already has
+    m.lt = Date.now();
+    cloudSaveMeta();
+    cloudSchedule(1500);
+  }
+  function cloudSchedule(ms) {
+    if (!cloudLinked()) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(() => cloudSync().catch(() => {}), ms);
+  }
+
+  // ---------- Auth (email + password) ----------
+  const CLOUD_AUTH_ERRORS = {
+    EMAIL_EXISTS: 'Taj email je već registriran — koristi Prijava.',
+    EMAIL_NOT_FOUND: 'Pogrešan email ili lozinka.',
+    INVALID_PASSWORD: 'Pogrešan email ili lozinka.',
+    INVALID_LOGIN_CREDENTIALS: 'Pogrešan email ili lozinka.',
+    INVALID_EMAIL: 'Email nije ispravan.',
+    MISSING_PASSWORD: 'Upiši lozinku.',
+    WEAK_PASSWORD: 'Lozinka mora imati barem 6 znakova.',
+    OPERATION_NOT_ALLOWED: 'U Firebaseu nije uključena prijava emailom (Authentication → Sign-in method → Email/Password).',
+    ADMIN_ONLY_OPERATION: 'Nove registracije su isključene u Firebaseu.',
+    TOO_MANY_ATTEMPTS_TRY_LATER: 'Previše pokušaja — pričekaj nekoliko minuta.',
+    USER_DISABLED: 'Ovaj korisnik je isključen u Firebaseu.',
+    TOKEN_EXPIRED: 'Prijava je istekla — prijavi se ponovno.',
+    INVALID_REFRESH_TOKEN: 'Prijava je istekla — prijavi se ponovno.',
+    USER_NOT_FOUND: 'Korisnik više ne postoji — prijavi se ponovno.',
+  };
+  function cloudAuthError(code) {
+    const c = String(code || '').split(/[ :]/)[0];
+    if (/API key not valid|API_KEY_INVALID/i.test(code || '')) return 'Web API ključ nije ispravan.';
+    return CLOUD_AUTH_ERRORS[c] || ('Prijava nije uspjela: ' + (code || 'nepoznata greška'));
+  }
+  async function cloudAuth(kind, email, password) {
+    const ep = kind === 'signUp' ? 'accounts:signUp' : 'accounts:signInWithPassword';
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/${ep}?key=${encodeURIComponent(cloudCfg.apiKey)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(cloudAuthError(j.error && j.error.message));
+    if (cloudCfg.uid && cloudCfg.uid !== j.localId) cloudMeta = {}; // another account: start its sync from scratch
+    cloudCfg.uid = j.localId; cloudCfg.email = j.email || email; cloudCfg.refreshToken = j.refreshToken;
+    cloudToken = { id: j.idToken, exp: Date.now() + (Number(j.expiresIn) || 3600) * 1000 - 60000 };
+    cloudSaveCfg(); cloudSaveMeta();
+  }
+  async function cloudIdToken() {
+    if (cloudToken && Date.now() < cloudToken.exp) return cloudToken.id;
+    const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(cloudCfg.apiKey)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(cloudCfg.refreshToken || ''),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const code = j.error && j.error.message;
+      if (/TOKEN_EXPIRED|INVALID_REFRESH_TOKEN|USER_NOT_FOUND|USER_DISABLED/.test(code || '')) { cloudCfg.refreshToken = null; cloudSaveCfg(); }
+      throw new Error(cloudAuthError(code));
+    }
+    cloudToken = { id: j.id_token, exp: Date.now() + (Number(j.expires_in) || 3600) * 1000 - 60000 };
+    if (j.refresh_token) { cloudCfg.refreshToken = j.refresh_token; cloudSaveCfg(); }
+    return cloudToken.id;
+  }
+  async function cloudDb(path, opts, retried) {
+    const tok = await cloudIdToken();
+    const url = `${cloudCfg.dbUrl.replace(/\/+$/, '')}/users/${encodeURIComponent(cloudCfg.uid)}${path}.json?auth=${encodeURIComponent(tok)}`;
+    const r = await fetch(url, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+    if (r.status === 401 && !retried) { cloudToken = null; return cloudDb(path, opts, true); }
+    if (r.status === 401 || r.status === 403) throw new Error('Baza odbija pristup — provjeri pravila baze (Rules) u Firebaseu.');
+    if (r.status === 404) throw new Error('Baza nije pronađena — provjeri adresu baze.');
+    if (!r.ok) throw new Error('Baza: HTTP ' + r.status);
+    return r.json();
+  }
+
+  // ---------- Sync ----------
+  function cloudMergeLists(localStr, cloudStr) {
+    let a, b;
+    try { a = JSON.parse(localStr); b = JSON.parse(cloudStr); } catch { return cloudStr; }
+    if (!Array.isArray(a) || !Array.isArray(b)) return cloudStr;
+    const id = x => (x && typeof x === 'object' && x.id != null) ? 'id:' + x.id : 'j:' + JSON.stringify(x);
+    const seen = new Set(b.map(id));
+    return JSON.stringify([...b, ...a.filter(x => !seen.has(id(x)))]);
+  }
+  function cloudWriteLocal(k, v) {
+    cloudApplying = true;
+    try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); }
+    finally { cloudApplying = false; }
+  }
+  async function cloudSync() {
+    if (!cloudLinked()) return { changed: [] };
+    if (cloudBusy) { cloudAgain = true; return { changed: [], busy: true }; }
+    cloudBusy = true;
+    const changed = [];
+    try {
+      const remote = (await cloudDb('/data', { method: 'GET' })) || {};
+      const firstLink = !Object.keys(cloudMeta).length;
+      if (firstLink) { // keep a copy of this device's data before anything from the cloud touches it
+        const snap = {};
+        cloudKeys().forEach(k => { const v = localStorage.getItem(k); if (v != null) snap[k] = v; });
+        try { lsSetRaw.call(localStorage, CLOUD_PRELINK_KEY, JSON.stringify({ at: Date.now(), data: snap })); } catch {}
+      }
+      const pushes = [];
+      for (const k of cloudKeys()) {
+        const local = localStorage.getItem(k);
+        const m = cloudMeta[k] || { t: 0 };
+        const r = remote[k] || null;
+        const rv = r && !r.del ? (r.v ?? null) : null;
+        const localChanged = m.h === undefined ? local != null : cloudHash(local) !== m.h;
+        const remoteChanged = !!r && (r.t || 0) > (m.t || 0);
+        if (localChanged && remoteChanged) {
+          if (m.h === undefined && rv != null && local != null) {
+            // first link with data on both sides: lists are merged, settings come from the cloud
+            if (CLOUD_DATA_KEYS.includes(k)) {
+              const merged = cloudMergeLists(local, rv);
+              cloudWriteLocal(k, merged); changed.push(k);
+              if (merged !== rv) pushes.push([k, merged, Date.now()]);
+              else cloudMeta[k] = { t: r.t, h: cloudHash(merged) };
+            } else { cloudWriteLocal(k, rv); changed.push(k); cloudMeta[k] = { t: r.t, h: cloudHash(rv) }; }
+          } else if ((m.lt || 0) > (r.t || 0)) pushes.push([k, local, m.lt]);
+          else { cloudWriteLocal(k, rv); changed.push(k); cloudMeta[k] = { t: r.t, h: cloudHash(rv) }; }
+        } else if (remoteChanged) {
+          if (cloudHash(rv) !== cloudHash(local)) { cloudWriteLocal(k, rv); changed.push(k); }
+          cloudMeta[k] = { t: r.t, h: cloudHash(rv) };
+        } else if (localChanged) {
+          pushes.push([k, local, m.lt || Date.now()]);
+        }
+      }
+      for (const [k, v, t] of pushes) {
+        const rec = v == null ? { del: true, t, dev: cloudCfg.dev } : { v, t, dev: cloudCfg.dev };
+        await cloudDb('/data/' + k, { method: 'PUT', body: JSON.stringify(rec) });
+        cloudMeta[k] = { t, h: cloudHash(v) };
+      }
+      if (pushes.length || firstLink) {
+        await cloudDb('/info', { method: 'PATCH', body: JSON.stringify({ email: cloudCfg.email || '', updated: Date.now(), app: 'jarvis' }) }).catch(() => {});
+      }
+      cloudSaveMeta();
+      cloudLastSync = Date.now(); cloudLastError = ''; cloudLastChanges = changed.length + pushes.length;
+      if (changed.length) cloudRefreshUi(changed);
+      return { changed, pushed: pushes.map(p => p[0]) };
+    } catch (e) {
+      cloudLastError = e.message;
+      throw e;
+    } finally {
+      cloudBusy = false;
+      cloudRenderStatus();
+      if (cloudAgain) { cloudAgain = false; cloudSchedule(300); }
+    }
+  }
+
+  // Values that arrived from the cloud go into memory and onto the screen.
+  const CLOUD_STATE_SETTERS = {
+    jarvis_anthropic_key: v => { state.keys.anthropic = v || ''; },
+    jarvis_gemini_key: v => { state.keys.gemini = v || ''; },
+    jarvis_openai_key: v => { state.keys.openai = v || ''; },
+    jarvis_openrouter_key: v => { state.keys.openrouter = v || ''; },
+    jarvis_eleven_key: v => { state.elevenKey = v || ''; },
+    jarvis_tavily_key: v => { state.tavilyKey = v || ''; },
+    jarvis_rezije_auth: v => { state.rezijeAuth = v || ''; utilCache = null; },
+    jarvis_anthropic_model: v => { if (v) state.models.anthropic = v; },
+    jarvis_gemini_model: v => { if (v) state.models.gemini = v; },
+    jarvis_openai_model: v => { if (v) state.models.openai = v; },
+    jarvis_openrouter_model: v => { if (v) state.models.openrouter = v; },
+    jarvis_openrouter_custom: v => { state.models.openrouterCustom = v || ''; },
+    jarvis_anthropic_effort: v => { state.anthropicEffort = v || 'low'; },
+    jarvis_auto_routing: v => { state.autoRouting = v !== 'false'; },
+    jarvis_forced_provider: v => { state.forcedProvider = v || 'anthropic'; },
+    jarvis_provider_enabled: v => { try { state.providerEnabled = JSON.parse(v || '{}') || {}; } catch {} },
+    jarvis_eleven_voice: v => { state.elevenVoice = v || 'JBFqnCBsd6RMkjVDRZzb'; },
+    jarvis_pitch: v => { state.pitch = parseFloat(v || '0.85'); },
+    jarvis_lang: v => { state.lang = v || 'auto'; },
+    jarvis_personality: v => { state.personality = parseInt(v || '1', 10); },
+    jarvis_boot_sequence: v => { state.bootSequenceEnabled = v !== 'false'; },
+    jarvis_morning_briefing: v => { state.morningBriefingEnabled = v === 'true'; },
+    jarvis_morning_prompt: v => { if (v) state.morningBriefingPrompt = v; },
+    jarvis_continuous_conv: v => { state.continuousConversation = v === 'true'; },
+    jarvis_memory_retention: v => { state.memoryRetentionDays = parseInt(v || '30', 10); },
+    jarvis_google_client_id: v => { state.googleClientId = v || ''; },
+    jarvis_theme: v => { state.theme = v || 'plava'; applyTheme(state.theme); },
+    jarvis_wa_country: v => { state.waCountryCode = v || '385'; },
+    jarvis_rezije_url: v => { state.rezijeUrl = v || ''; utilCache = null; },
+    jarvis_rezije_node: v => { state.rezijeNode = v || ''; utilCache = null; },
+    jarvis_rezije_app_url: v => { state.rezijeAppUrl = v || ''; },
+    jarvis_rezije_title: v => { state.rezijeTitle = v || ''; },
+    jarvis_contacts: () => { state.contacts = loadContacts(); renderContactsInSettings(); },
+    jarvis_memories: () => { try { state.memories = JSON.parse(localStorage.getItem('jarvis_memories') || '[]'); } catch { state.memories = []; } renderMemoriesInSettings(); },
+    jarvis_protocols: () => { try { state.protocols = JSON.parse(localStorage.getItem('jarvis_protocols') || '[]'); } catch { state.protocols = []; } renderProtocolsInSettings(); },
+    jarvis_expenses: () => { try { state.expenses = JSON.parse(localStorage.getItem('jarvis_expenses') || '[]'); } catch { state.expenses = []; } },
+    jarvis_reminders: () => { renderRemindersInSettings(); },
+    jarvis_shopping: () => { refreshShoppingViews(); },
+    jarvis_warranties: () => { renderWarrantiesInSettings(); },
+    jarvis_dates: () => { renderDatesInSettings(); },
+    jarvis_ideas: () => { renderIdeasInSettings(); },
+  };
+  function cloudRefreshUi(keys) {
+    cloudApplying = true; // re-rendering may re-save a list; that must not bounce back to the cloud
+    try {
+      keys.forEach(k => { const f = CLOUD_STATE_SETTERS[k]; if (f) { try { f(localStorage.getItem(k)); } catch (e) { console.warn('cloud apply', k, e); } } });
+      if (typeof refreshStatusBar === 'function') refreshStatusBar();
+    } finally { cloudApplying = false; }
+  }
+
+  // ---------- Settings section ----------
+  function cloudTime(t) { const d = new Date(t); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`; }
+  function cloudRenderStatus(msg, isError) {
+    const el = $('cloudStatus'); if (!el) return;
+    let s;
+    if (msg) s = msg;
+    else if (!cloudCfg.apiKey || !cloudCfg.dbUrl) s = 'Nije postavljeno.';
+    else if (!cloudCfg.uid) s = 'Nisi prijavljen.';
+    else if (!cloudCfg.refreshToken) { s = `Prijava za ${cloudCfg.email || 'korisnika'} je istekla — prijavi se ponovno.`; isError = true; }
+    else if (cloudLastError) { s = `Prijavljen: ${cloudCfg.email} · greška: ${cloudLastError}`; isError = true; }
+    else s = `Prijavljen: ${cloudCfg.email}` + (cloudLastSync ? ` · zadnja sinkronizacija ${cloudTime(cloudLastSync)}` : ' · sinkronizacija…');
+    el.textContent = s;
+    el.style.color = isError ? 'var(--red)' : '';
+    const linked = cloudLinked();
+    $('cloudLoginBtn').hidden = linked; $('cloudSignupBtn').hidden = linked;
+    $('cloudLogoutBtn').hidden = !linked; $('cloudSyncBtn').hidden = !linked;
+    $('cloudPasswordField').hidden = linked;
+    const dot = $('cloudDot');
+    if (dot) { dot.hidden = !cloudCfg.uid; dot.dataset.state = !linked ? 'off' : cloudLastError ? 'error' : 'ok'; dot.title = el.textContent; }
+  }
+  function cloudFillSettings() {
+    $('cloudApiKeyInput').value = cloudCfg.apiKey || '';
+    $('cloudDbUrlInput').value = cloudCfg.dbUrl || '';
+    $('cloudEmailInput').value = cloudCfg.email || '';
+    $('cloudPasswordInput').value = '';
+    $('cloudWithKeysToggle').checked = !!cloudCfg.withKeys;
+    cloudRenderStatus();
+  }
+  async function cloudLoginFromSettings(kind) {
+    const apiKey = $('cloudApiKeyInput').value.trim(), dbUrl = $('cloudDbUrlInput').value.trim().replace(/\/+$/, '');
+    const email = $('cloudEmailInput').value.trim(), password = $('cloudPasswordInput').value;
+    if (!apiKey || !dbUrl) { cloudRenderStatus('Upiši Web API ključ i adresu baze.', true); return; }
+    if (!/^https:\/\/[^/]+\.(firebasedatabase\.app|firebaseio\.com)$/.test(dbUrl)) { cloudRenderStatus('Adresa baze treba izgledati kao https://<projekt>-default-rtdb.<regija>.firebasedatabase.app', true); return; }
+    if (!email || !password) { cloudRenderStatus('Upiši email i lozinku.', true); return; }
+    cloudCfg.apiKey = apiKey; cloudCfg.dbUrl = dbUrl; cloudSaveCfg();
+    cloudRenderStatus(kind === 'signUp' ? 'Registracija…' : 'Prijava…');
+    try {
+      await cloudAuth(kind, email, password);
+      $('cloudPasswordInput').value = ''; // the password is never stored
+      cloudRenderStatus('Prijavljen — prvi put spajam podatke s ovog uređaja i iz oblaka…');
+      const r = await cloudSync();
+      cloudRenderStatus(`Prijavljen: ${cloudCfg.email} · sinkronizirano (preuzeto ${r.changed.length}, poslano ${(r.pushed || []).length}).`);
+      cloudStartTimers();
+    } catch (e) { cloudRenderStatus(e.message, true); }
+  }
+  function cloudLogout() {
+    cloudCfg.refreshToken = null; cloudCfg.uid = null; cloudToken = null; cloudMeta = {};
+    cloudSaveCfg(); cloudSaveMeta();
+    cloudRenderStatus('Odjavljen. Podaci ostaju na ovom uređaju i u oblaku.');
+  }
+  async function cloudSetWithKeys(on) {
+    cloudCfg.withKeys = !!on; cloudSaveCfg();
+    if (!cloudLinked()) return;
+    try {
+      if (on) await cloudSync();
+      else { // take the keys out of the cloud again
+        for (const k of CLOUD_SECRET_KEYS) { await cloudDb('/data/' + k, { method: 'DELETE' }); delete cloudMeta[k]; }
+        cloudSaveMeta();
+      }
+      cloudRenderStatus(on ? 'API ključevi se sada spremaju i u oblak.' : 'API ključevi uklonjeni iz oblaka; ostaju samo na ovom uređaju.');
+    } catch (e) { cloudRenderStatus(e.message, true); }
+  }
+  async function cloudSyncNow() {
+    cloudRenderStatus('Sinkronizacija…');
+    try { const r = await cloudSync(); cloudRenderStatus(); return r; }
+    catch (e) { cloudRenderStatus(e.message, true); throw e; }
+  }
+  let cloudTimersStarted = false;
+  function cloudStartTimers() {
+    if (cloudTimersStarted) return;
+    cloudTimersStarted = true;
+    setInterval(() => { if (cloudLinked() && document.visibilityState !== 'hidden') cloudSync().catch(() => {}); }, 20000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloudSchedule(200); });
+    window.addEventListener('focus', () => cloudSchedule(200));
+    window.addEventListener('online', () => cloudSchedule(200));
+  }
+  function cloudInit() {
+    $('cloudLoginBtn').addEventListener('click', () => cloudLoginFromSettings('signIn'));
+    $('cloudSignupBtn').addEventListener('click', () => cloudLoginFromSettings('signUp'));
+    $('cloudLogoutBtn').addEventListener('click', cloudLogout);
+    $('cloudSyncBtn').addEventListener('click', () => cloudSyncNow().catch(() => {}));
+    $('cloudWithKeysToggle').addEventListener('change', e => cloudSetWithKeys(e.target.checked));
+    cloudRenderStatus();
+    if (cloudLinked()) { cloudStartTimers(); cloudSchedule(800); }
+  }
+  // "sinkroniziraj", "stanje oblaka"
+  function matchCloudIntent(t) {
+    const x = normText(t).replace(/[.!?]+$/, '');
+    if (/^(sinkroniziraj|sinkronizacija|sinkroniziraj (podatke|oblak)|spremi (sve )?u oblak|sync)$/.test(x)) return 'sync';
+    if (/^(stanje|status) (oblaka|sinkronizacije)$|^jesu li (moji )?podaci (spremljeni )?u oblaku$/.test(x)) return 'status';
+    return null;
+  }
+  async function voiceCloud(userText, what, lang) {
+    let msg;
+    if (!cloudLinked()) msg = 'Oblak nije povezan. U postavkama, u dijelu Oblak, upiši podatke Firebase projekta i prijavi se.';
+    else if (what === 'status') msg = cloudLastError ? `Prijavljen si kao ${cloudCfg.email}, ali zadnja sinkronizacija nije uspjela: ${cloudLastError}` : `Prijavljen si kao ${cloudCfg.email}. Podaci su u oblaku${cloudLastSync ? `, zadnja sinkronizacija u ${cloudTime(cloudLastSync)}` : ''}.`;
+    else {
+      try { const r = await cloudSyncNow(); const n = r.changed.length + (r.pushed || []).length; msg = n ? `Sinkronizirano: ${n} ${plural(n, 'promjena', 'promjene', 'promjena')}.` : 'Sve je već sinkronizirano.'; }
+      catch (e) { msg = 'Sinkronizacija nije uspjela: ' + e.message; }
+    }
+    await localReply(userText, msg, lang);
+  }
+
   const state = {
     // Provider keys
     keys: {
@@ -5633,6 +6031,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (settingIntent) { voiceApplySetting(t, settingIntent, lang); return; }
     if (routeHouseholdIntents(t, lang)) return;
     if (routeVoiceIntents(t, lang)) return;
+    const cloudIntent = matchCloudIntent(t);
+    if (cloudIntent) { voiceCloud(t, cloudIntent, lang); return; }
     const meterState = utilConfigured() ? matchMeterStateIntent(t) : null;
     if (meterState) { voiceMeterState(t, meterState, lang); return; }
     const panel = rezijePanelIntent(t);
@@ -7029,6 +7429,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     $('morningBriefingToggle').checked = state.morningBriefingEnabled;
     $('morningBriefingPrompt').value = state.morningBriefingPrompt;
 
+    cloudFillSettings();
     $('elevenKeyInput').value = state.elevenKey;
     $('elevenVoiceSelect').value = state.elevenVoice;
     $('langSelect').value = state.lang;
@@ -7198,7 +7599,10 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       'jarvis_history',
       // Legacy keys from older versions
       'jarvis_api_key', 'jarvis_model',
+      // This device's cloud login — the cloud copy itself stays untouched
+      'jarvis_cloud', 'jarvis_cloud_meta', 'jarvis_cloud_prelink',
     ];
+    cloudSuspended = true; clearTimeout(cloudTimer);
     keysToRemove.forEach(k => localStorage.removeItem(k));
     location.reload();
   }
@@ -7472,6 +7876,8 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   initReminders();
   pruneExpiredMemories();
   if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
+
+  cloudInit();
 
   // Boot sequence animation, or skip straight past it if disabled
   applyTheme(state.theme);
