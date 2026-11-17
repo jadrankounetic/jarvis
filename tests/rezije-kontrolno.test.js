@@ -100,12 +100,16 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   pass(lastSpoken() === `Glavno stanje vode, prema obračunskom očitanju od ${spokenDate(mainDate)}, je 1225 kubika.`, '"obračunsko stanje vode": ' + lastSpoken());
 
   console.log('--- 2. Kontrolno stanje i stanje brojila ---');
-  const kw = 12300 - 12100, dn = days(MAIN, K2), proc = hep(kw, Math.round(dn / 30 * 100) / 100, PH);
+  // Kao u aplikaciji: svaki kontrolni redak od PRETHODNOG očitanja; ukupno od obračunskog = zbroj redaka.
+  const mjOf = n => Math.round(n / 30 * 100) / 100;
+  const kw1 = 12240 - 12100, dn1 = days(MAIN, K1), kw = 12300 - 12240, dnK = days(K1, K2), dn = days(MAIN, K2);
+  const proc = c2(hep(kw1, mjOf(dn1), PH) + hep(kw, mjOf(dnK), PH));
   await say('kontrolno stanje');
   card = lastCard('STANJE BROJILA');
-  pass(rows(card).some(r => r.includes('Kontrolno očitanje') && r.includes(K2)) && rows(card).some(r => r.includes(`${kw} kWh`) && r.includes(`${dn} dan`)), `Zadnje kontrolno: ${kw} kWh u ${dn} dana od obračuna`);
-  pass(rows(card).some(r => r.includes('Procjena troška struje') && r.includes(eurHr(proc))), `Procjena kao u aplikaciji: ${eurHr(proc)}`);
-  pass(lastSpoken().startsWith(`Zadnje kontrolno očitanje od ${spokenDate(k2)}: 12300 kilovatsati, to je ${kw} od obračunskog`), 'Glasom: ' + lastSpoken());
+  pass(rows(card).some(r => r.includes('Kontrolno očitanje') && r.includes(K2)) && rows(card).some(r => r.includes(`Od prethodnog (${K1})`) && r.includes(`${kw} kWh`) && r.includes(`${dnK} dan`)), `Zadnje kontrolno: ${kw} kWh od prethodnog (${K1})`);
+  pass(rows(card).some(r => r.includes(`Od obračunskog (${MAIN})`) && r.includes(`${kw1 + kw} kWh`) && r.includes(`${dn} dan`)), `Od obračunskog ukupno ${kw1 + kw} kWh u ${dn} dana`);
+  pass(rows(card).some(r => r.includes('Procjena troška struje od obračunskog') && r.includes(eurHr(proc))), `Procjena = zbroj redaka kao u aplikaciji: ${eurHr(proc)}`);
+  pass(lastSpoken() === `Zadnje kontrolno očitanje od ${spokenDate(k2)}: 12300 kilovatsati. Od prethodnog očitanja potrošeno je ${kw} kilovatsati, a od obračunskog ukupno ${kw1 + kw} u ${dn} dana, procjena troška ${eurHr(proc)}.`, 'Glasom: ' + lastSpoken());
   await say('stanje brojila');
   card = lastCard('STANJE BROJILA');
   pass(rows(card).some(r => r.includes('Voda') && r.includes('1225')) && rows(card).some(r => r.includes('Kontrolno očitanje')), '"stanje brojila": obračunsko (voda i struja) + kontrolno');
@@ -116,9 +120,14 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   pass(main.querySelectorAll('tr').length === 3, 'Tablica: 2 razdoblja iz 3 obračunska očitanja (kontrolna izostavljena)');
   const head = [...main.querySelectorAll('th')].map(t => t.textContent);
   pass(head.slice(0, 9).join('|') === 'Datum|Stanje vode|Voda m³|Voda €|Stanje struje|Struja kWh|Struja €|Fiksni €|Ukupno €', 'Tablica ima iste stupce kao aplikacija za režije');
-  const firstRow = [...main.querySelectorAll('tr')][1].textContent;
-  pass(firstRow.includes('1225') && firstRow.includes('12100') && !/12\.100|1\.225/.test(firstRow), 'Stanja kao u aplikaciji: 12100, 1225 (bez točke tisućica)');
-  pass(ko && ko.querySelectorAll('tr').length === 4 && d.querySelector('.rz-ko-title').textContent.includes('informativno'), 'Posebna tablica s 3 kontrolna očitanja (informativno)');
+  const mrows = [...main.querySelectorAll('tr')];
+  pass(mrows[1].textContent.includes('1212') && mrows[mrows.length - 1].textContent.includes('1225') && mrows[mrows.length - 1].textContent.includes('12100') && !/12\.100|1\.225/.test(main.textContent), 'Kao u aplikaciji: od najstarijeg, stanja 12100 i 1225 bez točke tisućica');
+  const krows = [...ko.querySelectorAll('tr')];
+  pass(krows.length === 5 && d.querySelector('.rz-ko-title').textContent.includes('informativno') && krows[0].textContent.includes('Od prethodnog'), 'Tablica kontrolnih: 3 očitanja + UKUPNO, stupac "Od prethodnog"');
+  pass(krows[1].textContent.includes(db.entries[2].d) && krows[1].textContent.includes(prevMain) && krows[1].textContent.includes('150'), 'Od najstarijeg; prvo kontrolno računato od prethodnog (obračunskog) očitanja');
+  pass(krows[3].textContent.includes(K2) && krows[3].textContent.includes(K1) && krows[3].textContent.includes(String(kw)), 'Zadnje kontrolno od prethodnog kontrolnog (60 kWh)');
+  const totalProc = c2(hep(150, mjOf(days(prevMain, db.entries[2].d)), PH) + hep(kw1, mjOf(dn1), PH) + hep(kw, mjOf(dnK), PH));
+  pass(krows[4].textContent.startsWith('UKUPNO') && krows[4].textContent.includes('350') && krows[4].textContent.includes(totalProc.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), `Red UKUPNO: 350 kWh, ${eurHr(totalProc)}`);
   const stHep = hep(12100 - 11800, 1, PH), vt = (1225 - 1212) * 1.68, uk = vt + stHep + 10.62;
   pass(main.textContent.replace(/\s+/g, ' ').includes(uk.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), `Zadnje razdoblje po HEP Plavi: ${eurHr(uk)}`);
   const stOld = ((11800 - 11500) + OLD.doi) * OLD.c_kwh_s * (1 + OLD.pdv_s), ukOld = 12 * 1.68 + stOld + 10.62;
@@ -133,13 +142,13 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   click(d.querySelector('.rz-kind button[data-ko="1"]')); await sleep(30);
   pass(!$('rzV') && $('rzSaveReading').textContent.includes('kontrolno'), 'Kontrolno: nema polja za vodu');
   $('rzK').value = '12350'; $('rzK').dispatchEvent(new w.Event('input')); await sleep(30);
-  const kwP = 250, dnP = days(MAIN, today), procP = hep(kwP, Math.round(dnP / 30 * 100) / 100, PH);
-  pass($('rzPreview').textContent.includes(`${kwP} kWh`) && $('rzPreview').textContent.includes(eurHr(procP)) && !$('rzSaveReading').disabled, `Pregled: ${kwP} kWh od obračuna, procjena ${eurHr(procP)}`);
+  const kwP = 50, dnP = days(K2, today), procP = hep(kwP, Math.round(dnP / 30 * 100) / 100, PH);
+  pass($('rzPreview').textContent.includes(`Od prethodnog (${K2})`) && $('rzPreview').textContent.includes(`${kwP} kWh`) && $('rzPreview').textContent.includes(eurHr(procP)) && !$('rzSaveReading').disabled, `Pregled: ${kwP} kWh od prethodnog, procjena ${eurHr(procP)}`);
   click($('rzSaveReading')); await waitFor(() => db.entries.length === 7, 'saved'); await waitFor(idle, 'idle'); await sleep(60);
   let e = db.entries[6];
   pass(e.ko === true && e.v === 0 && e.k === 12350 && e.d === today && JSON.stringify(Object.keys(e)) === '["id","d","v","k","p","ko"]', 'Spremljeno isto kao u aplikaciji: { id, d, v: 0, k, p, ko: true }');
   pass(fbLog.includes('PUT /entries/6'), 'Ciljani upis jednog unosa');
-  pass(lastSpoken().startsWith(`Kontrolno očitanje spremljeno. Od obračunskog očitanja ${MAIN} potrošeno je ${kwP} kilovatsati`), 'Glasom: ' + lastSpoken());
+  pass(lastSpoken().startsWith(`Kontrolno očitanje spremljeno. Od prethodnog očitanja ${K2} potrošeno je ${kwP} kilovatsati`), 'Glasom: ' + lastSpoken());
   click($('rzClose')); await sleep(30);
 
   console.log('--- 5. Glasom preko AI modela ---');

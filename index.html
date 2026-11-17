@@ -105,6 +105,7 @@
   @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
   .topbar-right { display: flex; gap: 14px; align-items: center; }
   #settingsModal [hidden], .cloud-dot[hidden] { display: none !important; }
+  .rz-table tr.rz-total td { font-weight: 700; color: var(--gold); border-top: 1px solid rgba(var(--gold-rgb), 0.6); }
   .rz-table td.rz-state { color: var(--text-dim); }
   .cloud-dot { font-size: 12px; margin-left: 6px; color: var(--text-dim); }
   .cloud-dot[data-state="ok"] { color: var(--cyan, #4fd1ff); }
@@ -1362,7 +1363,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.5';
+  const JARVIS_VERSION = '10.6';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1630,7 +1631,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     },
     {
       name: 'get_meter_status',
-      description: 'Current meter state: the latest obračunsko (billing, "glavno") reading of water and electricity, and the latest kontrolno (control) electricity reading after it with kWh, days and estimated cost since the billing reading. Shows a card.',
+      description: 'Current meter state: the latest obračunsko (billing, "glavno") reading of water and electricity, and the latest kontrolno (control) electricity reading after it — use since the previous reading, and the total kWh, days and estimated cost since the billing reading. Shows a card.',
       input_schema: {
         type: 'object',
         properties: {
@@ -3802,19 +3803,27 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     }
     return r;
   }
-  // Kontrolna očitanja: kWh, days and estimated electricity cost since the last billing reading.
+  // Kontrolna očitanja (as the app's kontrole()): every row is the use since the PREVIOUS
+  // reading — billing or control — so the rows add up to the total.
   function utilControls(all, p) {
-    const r = []; let last = null;
+    const r = []; let prev = null;
     for (const x of all) {
-      if (!x.ko) { last = x; continue; }
-      if (!last) { r.push({ id: x.id, date: x.d, st: x.k, od: null, kw: 0, dn: 0, dan: 0, proc: null }); continue; }
+      if (!x.ko) { prev = x; continue; }
+      if (!prev) { r.push({ id: x.id, date: x.d, st: x.k, od: null, kw: 0, dn: 0, dan: 0, proc: null }); prev = x; continue; }
       const cp = x.p || p;
-      const kw = Math.round(x.k - last.k), dn = utilDays(last.d, x.d);
+      const kw = Math.round(x.k - prev.k), dn = utilDays(prev.d, x.d);
       const mj = dn > 0 ? Math.round(dn / 30 * 100) / 100 : 0;
       const proc = (cp.c_opsk !== undefined && cp.c_opsk !== null) ? utilHep(kw, mj, cp) : null;
-      r.push({ id: x.id, date: x.d, st: x.k, od: last.d, kw, dn, dan: dn > 0 ? kw / dn : 0, proc });
+      r.push({ id: x.id, date: x.d, st: x.k, od: prev.d, kw, dn, dan: dn > 0 ? kw / dn : 0, proc });
+      prev = x;
     }
     return r;
+  }
+  // The app's UKUPNO row: sums of the rows that have a previous reading.
+  function utilControlTotals(rows) {
+    const a = { kw: 0, dn: 0, proc: 0 };
+    for (const r of rows) { if (!r.od) continue; a.kw += r.kw; a.dn += r.dn; a.proc += (r.proc || 0); }
+    return a;
   }
   // UTIL-CALC-END
   const HR_MONTHS_GEN = ['siječnja', 'veljače', 'ožujka', 'travnja', 'svibnja', 'lipnja', 'srpnja', 'kolovoza', 'rujna', 'listopada', 'studenoga', 'prosinca'];
@@ -3828,7 +3837,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     for (let i = ent.length - 1; i > iMain; i--) if (ent[i].ko) { iCtrl = i; break; }
     const ctrls = utilControls(ent, data.params);
     const ctrl = iCtrl >= 0 ? ctrls.find(c => c.id === ent[iCtrl].id) || null : null;
-    return { main: iMain >= 0 ? ent[iMain] : null, ctrl };
+    const afterIds = new Set(ent.slice(iMain + 1).filter(e => e.ko).map(e => e.id));
+    const since = iMain >= 0 && ctrl ? Object.assign(utilControlTotals(ctrls.filter(c => afterIds.has(c.id))), { from: ent[iMain].d }) : null;
+    return { main: iMain >= 0 ? ent[iMain] : null, ctrl, since };
   }
   function eur(n) {
     return (n == null || isNaN(n)) ? '—' : n.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -3914,7 +3925,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       if (check.last) c += ` Last billing (obračunsko) reading ${check.last.d}: ${check.last.k} kWh.`;
       if (check.problems.length) return c + ' PROBLEM: ' + check.problems.join(' ') + ' Tell the user and ask for the correct number.';
       if (utilDraft.k == null) return c + ' Ask the user for the electricity reading.';
-      if (check.kpreview && check.kpreview.od) c += ` Since the billing reading: ${check.kpreview.kw} kWh in ${check.kpreview.dn} days${check.kpreview.proc != null ? `, estimated electricity cost ${check.kpreview.proc.toFixed(2)} €` : ''}.`;
+      if (check.kpreview && check.kpreview.od) c += ` Since the previous reading (${check.kpreview.od}): ${check.kpreview.kw} kWh in ${check.kpreview.dn} days${check.kpreview.proc != null ? `, estimated electricity cost ${check.kpreview.proc.toFixed(2)} €` : ''}.`;
       return c + ' NOT saved yet — read it back briefly and ask the user to say "potvrdi" to save or "odustani" to cancel.';
     }
     let s = `Draft billing (obračunsko) reading for ${utilDraft.d}: water ${utilDraft.v ?? 'MISSING'} m³, electricity ${utilDraft.k ?? 'MISSING'} kWh.`;
@@ -3968,7 +3979,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       ? utilRow('Zadnje obračunsko', `${check.last.d} · ${rdg(check.last.k)} kWh`)
       : utilRow('Prethodno', `${check.last.d} · ${rdg(check.last.v)} m³ · ${rdg(check.last.k)} kWh`);
     if (d.ko && check.kpreview && check.kpreview.od) {
-      body += utilRow('Od obračuna', `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
+      body += utilRow(`Od prethodnog (${check.kpreview.od})`, `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')}${check.kpreview.dn > 0 ? ` · ${numHr(check.kpreview.dan, 2)} kWh/dan` : ''}`);
       if (check.kpreview.proc != null) body += utilRow('Procjena troška struje', eur(check.kpreview.proc), 'util-total');
     }
     if (!d.ko && check.preview) {
@@ -4023,7 +4034,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     renderUtilSummaryCard(recent, avg, res.length);
     const lines = recent.map(r => `Period ending ${r.date}: water ${r.vm.toFixed(2)} m³ = ${r.vt.toFixed(2)} €, electricity ${Math.round(r.sk)} kWh = ${r.st.toFixed(2)} €, fixed fees ${r.fx.toFixed(2)} €, TOTAL ${r.uk.toFixed(2)} €`);
     const ms = utilMeterStatus(data);
-    const ctrl = ms.ctrl && ms.ctrl.od ? `\nLatest control (kontrolno) electricity reading ${ms.ctrl.date}: ${ms.ctrl.kw} kWh since the billing reading ${ms.ctrl.od} (${ms.ctrl.dn} days)${ms.ctrl.proc != null ? `, estimated electricity cost so far ${ms.ctrl.proc.toFixed(2)} €` : ''}. Control readings are informative and not part of the totals.` : '';
+    const ctrl = ms.ctrl && ms.since ? `\nLatest control (kontrolno) electricity reading ${ms.ctrl.date}: ${ms.since.kw} kWh since the billing reading ${ms.since.from} (${ms.since.dn} days), estimated electricity cost so far ${ms.since.proc.toFixed(2)} €. Control readings are informative and not part of the totals.` : '';
     return `Utility costs from billing (obračunska) readings, oldest to newest (a table card is shown):\n${lines.join('\n')}\nAverage per period across all ${res.length} periods: ${avg.toFixed(2)} €.${ctrl}`;
   }
   async function utilPricesText() {
@@ -4098,7 +4109,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         if (r && r.ko) {
           const c = r.row;
           msg = c && c.od
-            ? `Kontrolno očitanje spremljeno. Od obračunskog očitanja ${c.od} potrošeno je ${kwh(c.kw)} kilovatsati u ${c.dn} ${plural(c.dn, 'dan', 'dana', 'dana')}${c.proc != null ? `, procjena troška struje ${eur(c.proc)}` : ''}.`
+            ? `Kontrolno očitanje spremljeno. Od prethodnog očitanja ${c.od} potrošeno je ${kwh(c.kw)} kilovatsati u ${c.dn} ${plural(c.dn, 'dan', 'dana', 'dana')}${c.proc != null ? `, procjena troška struje ${eur(c.proc)}` : ''}.`
             : 'Kontrolno očitanje spremljeno.';
         } else msg = r
           ? `Očitanje spremljeno. Potrošeno je ${numHr(r.vm)} kubika vode i ${kwh(r.sk)} kilovatsati struje. Režije za ovo razdoblje su ${eur(r.uk)}.`
@@ -4155,7 +4166,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     let msg;
     try {
       const check = await utilSetDraftKind(ko);
-      if (ko) msg = 'Upisujem kao kontrolno očitanje struje.' + (check && check.kpreview && check.kpreview.od && check.kpreview.proc != null ? ` Od obračuna ${kwh(check.kpreview.kw)} kilovatsati, procjena ${eur(check.kpreview.proc)}.` : '');
+      if (ko) msg = 'Upisujem kao kontrolno očitanje struje.' + (check && check.kpreview && check.kpreview.od && check.kpreview.proc != null ? ` Od prethodnog očitanja ${kwh(check.kpreview.kw)} kilovatsati, procjena ${eur(check.kpreview.proc)}.` : '');
       else msg = 'Upisujem kao obračunsko očitanje.' + (utilDraft && utilDraft.v == null ? ' Reci mi još stanje vode.' : '');
       if (utilDraftComplete() && !(check && check.problems.length)) msg += ' Reci "potvrdi" za spremanje.';
     } catch (e) { msg = 'Nije uspjelo: ' + e.message; }
@@ -4164,7 +4175,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // ---------- "Glavno stanje struje" ----------
   // q: { what: 'k' | 'v' | 'both', kind: 'main' | 'ctrl' | 'both' }
   function utilMeterStateReply(data, q) {
-    const { main, ctrl } = utilMeterStatus(data);
+    const { main, ctrl, since } = utilMeterStatus(data);
     const wantK = q.what !== 'v', wantV = q.what !== 'k';
     const parts = [], model = [];
     let body = '';
@@ -4184,10 +4195,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       if (ctrl) {
         body += `<div class="util-sep"></div>` + utilRow('Kontrolno očitanje', ctrl.date) + utilRow('⚡ Struja', `${rdg(ctrl.st)} kWh`);
         if (ctrl.od) {
-          body += utilRow('Od obračuna', `${kwh(ctrl.kw)} kWh · ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')} · ${numHr(ctrl.dan, 1)} kWh/dan`);
-          if (ctrl.proc != null) body += utilRow('Procjena troška struje', eur(ctrl.proc), 'util-total');
-          parts.push(`${q.kind === 'ctrl' ? 'Zadnje kontrolno' : 'Kontrolno'} očitanje od ${hrDateSpoken(ctrl.date)}: ${rdg(ctrl.st)} kilovatsati, to je ${kwh(ctrl.kw)} od obračunskog u ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')}${ctrl.proc != null ? `, procjena troška ${eur(ctrl.proc)}` : ''}.`);
-          model.push(`Latest control (kontrolno) reading ${ctrl.date}: ${ctrl.st} kWh, ${ctrl.kw} kWh in ${ctrl.dn} days since the billing reading ${ctrl.od}${ctrl.proc != null ? `, estimated electricity cost ${ctrl.proc.toFixed(2)} €` : ''}.`);
+          body += utilRow(`Od prethodnog (${ctrl.od})`, `${kwh(ctrl.kw)} kWh · ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')}${ctrl.dn > 0 ? ` · ${numHr(ctrl.dan, 2)} kWh/dan` : ''}${ctrl.proc != null ? ` · ${eur(ctrl.proc)}` : ''}`);
+          const multi = since && since.from !== ctrl.od;
+          if (since) {
+            body += utilRow(`Od obračunskog (${since.from})`, `${kwh(since.kw)} kWh · ${since.dn} ${plural(since.dn, 'dan', 'dana', 'dana')}${since.dn > 0 ? ` · ${numHr(since.kw / since.dn, 2)} kWh/dan` : ''}`);
+            body += utilRow('Procjena troška struje od obračunskog', eur(since.proc), 'util-total');
+          }
+          let sentence = `${q.kind === 'ctrl' ? 'Zadnje kontrolno' : 'Kontrolno'} očitanje od ${hrDateSpoken(ctrl.date)}: ${rdg(ctrl.st)} kilovatsati.`;
+          if (multi) sentence += ` Od prethodnog očitanja potrošeno je ${kwh(ctrl.kw)} kilovatsati, a od obračunskog ukupno ${kwh(since.kw)} u ${since.dn} ${plural(since.dn, 'dan', 'dana', 'dana')}, procjena troška ${eur(since.proc)}.`;
+          else sentence += ` Od obračunskog očitanja potrošeno je ${kwh(ctrl.kw)} kilovatsati u ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')}${ctrl.proc != null ? `, procjena troška ${eur(ctrl.proc)}` : ''}.`;
+          parts.push(sentence);
+          model.push(`Latest control (kontrolno) reading ${ctrl.date}: ${ctrl.st} kWh; since the previous reading ${ctrl.od}: ${ctrl.kw} kWh in ${ctrl.dn} days${ctrl.proc != null ? ` (estimate ${ctrl.proc.toFixed(2)} €)` : ''}.` + (since ? ` Since the billing reading ${since.from}: ${since.kw} kWh in ${since.dn} days, estimated electricity cost ${since.proc.toFixed(2)} € (sum of the control rows, as in the utilities app).` : ''));
         } else {
           parts.push(`Kontrolno očitanje od ${hrDateSpoken(ctrl.date)}: ${rdg(ctrl.st)} kilovatsati.`);
           model.push(`Latest control reading ${ctrl.date}: ${ctrl.st} kWh.`);
@@ -4513,7 +4531,7 @@ Rules:
     const what = type === 'v' ? `${rdg(reading.value)} kubika na brojilu vode` : `${rdg(reading.value)} kilovatsati na brojilu struje`;
     let next;
     if (check.problems.length) next = check.problems.join(' ') + ' Slikaj ponovno ili mi reci ispravan broj.';
-    else if (utilDraft.ko) next = (check.kpreview && check.kpreview.od ? `Kontrolno: od obračuna ${kwh(check.kpreview.kw)} kilovatsati${check.kpreview.proc != null ? `, procjena ${eur(check.kpreview.proc)}` : ''}. ` : 'Kontrolno očitanje. ') + 'Reci "potvrdi" za spremanje ili "odustani".';
+    else if (utilDraft.ko) next = (check.kpreview && check.kpreview.od ? `Kontrolno: od prethodnog očitanja ${kwh(check.kpreview.kw)} kilovatsati${check.kpreview.proc != null ? `, procjena ${eur(check.kpreview.proc)}` : ''}. ` : 'Kontrolno očitanje. ') + 'Reci "potvrdi" za spremanje ili "odustani".';
     else if (utilDraft.v == null) next = givenBase64 ? 'Sada slikaj brojilo vode ili ga odaberi iz galerije.' : 'Sada slikaj brojilo vode.';
     else if (utilDraft.k == null) next = givenBase64 ? 'Sada slikaj brojilo struje ili ga odaberi iz galerije.' : 'Sada slikaj brojilo struje.';
     else next = (check.preview ? `Režije za ovo razdoblje bit će ${eur(check.preview.uk)}. ` : '') + 'Reci "potvrdi" za spremanje ili "odustani".';
@@ -6598,7 +6616,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   function rzTableHtml(data) {
     const res = utilCalc(data.entries, data.params);
     if (!res.length) return `<div class="rz-empty">Za izračun trebaju barem dva očitanja.<br>Dodaj ih u kartici Unos ili reci "slikaj brojilo vode".</div>`;
-    const rows = res.slice().reverse().map(r => `<tr>
+    const rows = res.map(r => `<tr>
         <td>${escapeHtml(r.date)}</td><td class="rz-state">${rdg(r.sv)}</td><td>${numHr(r.vm, 2)}</td><td>${numHr(r.vt, 2)}</td>
         <td class="rz-state">${rdg(r.sk2)}</td><td>${kwh(r.sk)}</td><td>${numHr(r.st, 2)}</td><td>${numHr(r.fx, 2)}</td>
         <td class="util-uk">${numHr(r.uk, 2)}</td>
@@ -6610,16 +6628,18 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   function rzControlsHtml(data) {
     const kon = utilControls(data.entries, data.params);
     if (!kon.length) return '';
-    const rows = kon.slice().reverse().map(r => `<tr>
+    const kt = utilControlTotals(kon);
+    const rows = kon.map(r => `<tr>
         <td>${escapeHtml(r.date)}</td><td>${rdg(r.st)}</td><td>${r.od ? escapeHtml(r.od) : '—'}</td>
         <td>${r.od ? kwh(r.kw) : '—'}</td><td>${r.od ? r.dn : '—'}</td><td>${r.od && r.dn > 0 ? numHr(r.dan, 2) : '—'}</td>
         <td class="util-uk">${r.od && r.proc != null ? numHr(r.proc, 2) : '—'}</td>
         <td><button class="rz-del" type="button" data-id="${r.id}" aria-label="Obriši kontrolno očitanje ${escapeHtml(r.date)}">×</button></td></tr>`).join('');
     return `<div class="rz-section rz-ko-title">Kontrolna očitanja struje <span class="rz-ko-tag">informativno</span></div>
       <div class="rz-scroll"><table class="util-table rz-table rz-ko-table">
-        <tr><th>Datum</th><th>Stanje kWh</th><th>Od obračuna</th><th>Potrošeno kWh</th><th>Dana</th><th>kWh/dan</th><th>Procjena €</th><th></th></tr>
-        ${rows}</table></div>
-      <div class="rz-status">Procjena je trošak struje od zadnjeg obračunskog očitanja, po cijenama u trenutku unosa. Kontrolna očitanja ne ulaze u tablicu iznad, grafove ni ukupne iznose.</div>`;
+        <tr><th>Datum</th><th>Stanje kWh</th><th>Od prethodnog</th><th>Potrošeno kWh</th><th>Dana</th><th>kWh/dan</th><th>Procjena €</th><th></th></tr>
+        ${rows}
+        <tr class="rz-total"><td>UKUPNO</td><td></td><td></td><td>${kwh(kt.kw)}</td><td>${kt.dn}</td><td>${kt.dn > 0 ? numHr(kt.kw / kt.dn, 2) : '—'}</td><td class="util-uk">${numHr(utilF2(kt.proc), 2)}</td><td></td></tr></table></div>
+      <div class="rz-status">Svaki redak pokazuje potrošnju od prethodnog očitanja (obračunskog ili kontrolnog), pa se iznosi zbrajaju u ukupno. Procjena je informativna, po cijenama važećim u trenutku unosa; kontrolna očitanja ne ulaze u tablicu iznad, grafove ni ukupne iznose.</div>`;
   }
 
   // ---------- Unos ----------
@@ -6690,7 +6710,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const check = utilValidateDraft(data);
     let h = '';
     if (utilDraft.ko && check.kpreview && check.kpreview.od) {
-      h += utilRow('Od obračuna', `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
+      h += utilRow(`Od prethodnog (${check.kpreview.od})`, `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')}${check.kpreview.dn > 0 ? ` · ${numHr(check.kpreview.dan, 2)} kWh/dan` : ''}`);
       if (check.kpreview.proc != null) h += utilRow('Procjena troška struje', eur(check.kpreview.proc), 'util-total');
     } else if (!utilDraft.ko && check.preview) {
       h += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${kwh(check.preview.sk)} kWh`)
