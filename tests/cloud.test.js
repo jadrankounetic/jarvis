@@ -152,6 +152,14 @@ const server = k => { const r = getAt(['users', fb.users['ja@example.com'].uid, 
   await A.waitFor(() => (A.ls('jarvis_ideas') || '').includes('garaži'), 'idea on A', 3000);
   pass((A.ls('jarvis_ideas') || '').includes('garaži'), 'Kad se Jarvis otvori (focus), A odmah povuče novu ideju s B');
 
+  console.log('--- 4b. Izbor modela vrijedi samo za uređaj ---');
+  await A.say('isključi Gemini');
+  await sleep(1800);
+  pass(JSON.parse(A.ls('jarvis_provider_enabled') || '{}').gemini === false, 'A: Gemini isključen');
+  pass(server('jarvis_provider_enabled') === null && server('jarvis_auto_routing') === null, 'Izbor modela ne ide u oblak');
+  await B.say('sinkroniziraj');
+  pass(JSON.parse(B.ls('jarvis_provider_enabled') || '{}').gemini !== false, 'B i dalje ima Gemini');
+
   console.log('--- 5. Istek prijave ---');
   fb.ids = {}; // svi ID tokeni istekli
   await A.say('dodaj jaja na popis');

@@ -816,6 +816,7 @@
     </div>
 
     <h3 style="margin-top: 0; padding-top: 0; border-top: none;">Provider Mode</h3>
+    <div class="field-hint" style="margin:-4px 0 8px;">Auto-routing, prisilni model i uključeni modeli vrijede samo za ovaj uređaj (ne dijele se preko oblaka).</div>
 
     <div class="toggle-row">
       <div>
@@ -1261,7 +1262,7 @@
       </label>
     </div>
     <div class="info-note">
-      U oblak idu: kontakti, popis za kupovinu, garancije, važni datumi, podsjetnici, ideje, pamćenje, protokoli, troškovi i postavke (izgled, glas, modeli, veza na režije). Samo na uređaju ostaju razgovor, statistika potrošnje i Wake Word. Podaci su pod tvojim korisnikom i pravila baze nikome drugome ne daju pristup. Promjene s drugog uređaja stižu u roku od 20 sekundi ili odmah kad otvoriš Jarvisa. Glasom: "sinkroniziraj", "stanje oblaka".
+      U oblak idu: kontakti, popis za kupovinu, garancije, važni datumi, podsjetnici, ideje, pamćenje, protokoli, troškovi i postavke (izgled, glas, modeli, veza na režije). Samo na uređaju ostaju razgovor, statistika potrošnje, Wake Word i izbor AI modela (koji su uključeni, auto-routing). Podaci su pod tvojim korisnikom i pravila baze nikome drugome ne daju pristup. Promjene s drugog uređaja stižu u roku od 20 sekundi ili odmah kad otvoriš Jarvisa. Glasom: "sinkroniziraj", "stanje oblaka".
     </div>
 
     <h3>Backup</h3>
@@ -1360,7 +1361,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.2';
+  const JARVIS_VERSION = '10.3';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -2281,13 +2282,15 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   const CLOUD_DATA_KEYS = ['jarvis_contacts', 'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_reminders',
     'jarvis_ideas', 'jarvis_memories', 'jarvis_protocols', 'jarvis_expenses'];
   const CLOUD_SETTING_KEYS = ['jarvis_anthropic_model', 'jarvis_gemini_model', 'jarvis_openai_model', 'jarvis_openrouter_model',
-    'jarvis_openrouter_custom', 'jarvis_anthropic_effort', 'jarvis_auto_routing', 'jarvis_forced_provider', 'jarvis_provider_enabled',
+    'jarvis_openrouter_custom', 'jarvis_anthropic_effort',
     'jarvis_eleven_voice', 'jarvis_pitch', 'jarvis_lang', 'jarvis_personality', 'jarvis_boot_sequence', 'jarvis_morning_briefing',
     'jarvis_morning_prompt', 'jarvis_continuous_conv', 'jarvis_memory_retention', 'jarvis_google_client_id', 'jarvis_theme',
     'jarvis_wa_country', 'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_app_url', 'jarvis_rezije_title'];
   const CLOUD_SECRET_KEYS = ['jarvis_anthropic_key', 'jarvis_gemini_key', 'jarvis_openai_key', 'jarvis_openrouter_key',
     'jarvis_eleven_key', 'jarvis_tavily_key', 'jarvis_rezije_auth'];
-  // Device-only on purpose: conversation, usage counters, wake word, last-shown dates, and the cloud login itself.
+  // Device-only on purpose: conversation, usage counters, wake word, last-shown dates, the cloud login itself,
+  // and which AI providers this device uses (on/off, auto-routing, forced provider) — e.g. Gemini off on a
+  // laptop whose network blocks it, while the phone keeps all of them.
   const CLOUD_CFG_KEY = 'jarvis_cloud', CLOUD_META_KEY = 'jarvis_cloud_meta', CLOUD_PRELINK_KEY = 'jarvis_cloud_prelink';
   const lsSetRaw = Storage.prototype.setItem, lsRemoveRaw = Storage.prototype.removeItem;
   let cloudCfg = (() => { try { return JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || 'null') || {}; } catch { return {}; } })();
@@ -2485,9 +2488,6 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     jarvis_openrouter_model: v => { if (v) state.models.openrouter = v; },
     jarvis_openrouter_custom: v => { state.models.openrouterCustom = v || ''; },
     jarvis_anthropic_effort: v => { state.anthropicEffort = v || 'low'; },
-    jarvis_auto_routing: v => { state.autoRouting = v !== 'false'; },
-    jarvis_forced_provider: v => { state.forcedProvider = v || 'anthropic'; },
-    jarvis_provider_enabled: v => { try { state.providerEnabled = JSON.parse(v || '{}') || {}; } catch {} },
     jarvis_eleven_voice: v => { state.elevenVoice = v || 'JBFqnCBsd6RMkjVDRZzb'; },
     jarvis_pitch: v => { state.pitch = parseFloat(v || '0.85'); },
     jarvis_lang: v => { state.lang = v || 'auto'; },
