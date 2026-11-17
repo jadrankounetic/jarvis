@@ -1361,7 +1361,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.3';
+  const JARVIS_VERSION = '10.4';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -2441,6 +2441,9 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
               cloudWriteLocal(k, merged); changed.push(k);
               if (merged !== rv) pushes.push([k, merged, Date.now()]);
               else cloudMeta[k] = { t: r.t, h: cloudHash(merged) };
+            } else if (rv === '' && local !== '') {
+              // settings saved on a fresh device leave empty fields; they must not wipe a real value here
+              pushes.push([k, local, Date.now()]);
             } else { cloudWriteLocal(k, rv); changed.push(k); cloudMeta[k] = { t: r.t, h: cloudHash(rv) }; }
           } else if ((m.lt || 0) > (r.t || 0)) pushes.push([k, local, m.lt]);
           else { cloudWriteLocal(k, rv); changed.push(k); cloudMeta[k] = { t: r.t, h: cloudHash(rv) }; }
@@ -2520,6 +2523,24 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       keys.forEach(k => { const f = CLOUD_STATE_SETTERS[k]; if (f) { try { f(localStorage.getItem(k)); } catch (e) { console.warn('cloud apply', k, e); } } });
       if (typeof refreshStatusBar === 'function') refreshStatusBar();
     } finally { cloudApplying = false; }
+  }
+
+  // v10.0–10.3 could let empty settings from another device overwrite real ones at the first
+  // link (e.g. the režije connection). The copy kept before the first link restores every
+  // setting that is now empty but had a value then — once per device.
+  function cloudRepairFromPrelink() {
+    if (cloudCfg.prelinkRepaired) return [];
+    cloudCfg.prelinkRepaired = true; cloudSaveCfg();
+    let snap = null;
+    try { snap = JSON.parse(localStorage.getItem(CLOUD_PRELINK_KEY) || 'null'); } catch {}
+    if (!snap || !snap.data) return [];
+    const restored = [];
+    for (const k of [...CLOUD_SETTING_KEYS, ...(cloudCfg.withKeys ? CLOUD_SECRET_KEYS : [])]) {
+      const old = snap.data[k], cur = localStorage.getItem(k);
+      if (old != null && old !== '' && (cur == null || cur === '')) { localStorage.setItem(k, old); restored.push(k); }
+    }
+    if (restored.length) cloudRefreshUi(restored);
+    return restored;
   }
 
   // ---------- Settings section ----------
@@ -2605,7 +2626,14 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     $('cloudSyncBtn').addEventListener('click', () => cloudSyncNow().catch(() => {}));
     $('cloudWithKeysToggle').addEventListener('change', e => cloudSetWithKeys(e.target.checked));
     cloudRenderStatus();
-    if (cloudLinked()) { cloudStartTimers(); cloudSchedule(800); }
+    if (cloudLinked()) {
+      const fixed = cloudRepairFromPrelink();
+      if (fixed.length) {
+        const rz = fixed.some(k => k.startsWith('jarvis_rezije'));
+        addMessage('assistant', `Vratio sam ${fixed.length} ${plural(fixed.length, 'postavku', 'postavke', 'postavki')} koje je prvo povezivanje s oblakom bilo ispraznilo${rz ? ' (među njima veza na režije)' : ''}.`);
+      }
+      cloudStartTimers(); cloudSchedule(800);
+    }
   }
   // "sinkroniziraj", "stanje oblaka"
   function matchCloudIntent(t) {

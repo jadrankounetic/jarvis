@@ -198,5 +198,38 @@ const server = k => { const r = getAt(['users', fb.users['ja@example.com'].uid, 
   pass(C.spoken[C.spoken.length - 1].startsWith('Oblak nije povezan.'), '"stanje oblaka" bez prijave');
   await A.say('stanje oblaka');
   pass(A.spoken[A.spoken.length - 1].startsWith('Prijavljen si kao ja@example.com.'), '"stanje oblaka": ' + A.spoken[A.spoken.length - 1]);
+  console.log('--- 9. Prazna polja s novog uređaja ne brišu postavke drugog ---');
+  const L = device('l', { jarvis_gemini_key: 'gL', jarvis_boot_sequence: 'false', jarvis_lang: 'hr-HR' });
+  await sleep(300);
+  L.click(L.$('settingsBtn')); await sleep(20); L.click(L.$('saveSettings')); await sleep(30); // prazna polja režija spremljena kao ''
+  pass(L.ls('jarvis_rezije_url') === '', 'Novi uređaj ima prazno polje režija');
+  await L.login('signUp', 'drugi@example.com');
+  const srv2 = k => { const r = getAt(['users', fb.users['drugi@example.com'].uid, 'data', k]); return r && !r.del ? r.v : null; };
+  pass(srv2('jarvis_rezije_url') === '', 'Prazno polje je u oblaku');
+  const P = device('p', { jarvis_gemini_key: 'gP', jarvis_boot_sequence: 'false', jarvis_lang: 'hr-HR',
+    jarvis_rezije_url: 'https://kuca-default-rtdb.example.firebasedatabase.app', jarvis_rezije_node: 'kuca', jarvis_rezije_title: 'Kuća' });
+  await sleep(300);
+  await P.login('signIn', 'drugi@example.com');
+  pass(P.ls('jarvis_rezije_url') === 'https://kuca-default-rtdb.example.firebasedatabase.app' && P.ls('jarvis_rezije_node') === 'kuca', 'Mobitel zadržao vezu na režije');
+  pass(srv2('jarvis_rezije_url') === 'https://kuca-default-rtdb.example.firebasedatabase.app', 'Veza na režije poslana u oblak');
+  L.w.dispatchEvent(new L.w.Event('focus'));
+  await L.waitFor(() => L.ls('jarvis_rezije_node') === 'kuca', 'laptop gets rezije');
+  pass(L.ls('jarvis_rezije_node') === 'kuca' && L.ls('jarvis_rezije_title') === 'Kuća', 'Laptop dobio vezu na režije');
+
+  console.log('--- 10. Popravak uređaja kojem je prvo povezivanje ispraznilo postavke ---');
+  const uid2 = fb.users['drugi@example.com'].uid; fb.refresh['rtR'] = uid2;
+  setAt(['users', uid2, 'data', 'jarvis_rezije_url'], { v: '', t: Date.now() + 1000, dev: 'x' }); // kao da je prazno stiglo iz oblaka
+  const R = device('r', { jarvis_gemini_key: 'gR', jarvis_boot_sequence: 'false', jarvis_lang: 'hr-HR',
+    jarvis_rezije_url: '', jarvis_rezije_node: '', jarvis_theme: 'crvena',
+    jarvis_cloud: JSON.stringify({ apiKey: API_KEY, dbUrl: DB, uid: uid2, email: 'drugi@example.com', refreshToken: 'rtR', dev: 'dR' }),
+    jarvis_cloud_meta: JSON.stringify({ jarvis_rezije_url: { t: Date.now() + 1000, h: '-' } }),
+    jarvis_cloud_prelink: JSON.stringify({ at: 1, data: { jarvis_rezije_url: 'https://stara-default-rtdb.example.firebasedatabase.app', jarvis_rezije_node: 'stari', jarvis_theme: 'zelena' } }) });
+  await sleep(400);
+  pass(R.ls('jarvis_rezije_url') === 'https://stara-default-rtdb.example.firebasedatabase.app' && R.ls('jarvis_rezije_node') === 'stari', 'Ispražnjena veza na režije vraćena iz kopije prije povezivanja');
+  pass(R.ls('jarvis_theme') === 'crvena', 'Postavke koje nisu prazne ostaju kakve jesu');
+  pass([...R.d.querySelectorAll('.msg-text')].some(m => m.textContent.includes('Vratio sam 2 postavke') && m.textContent.includes('veza na režije')), 'Jarvis javlja što je vratio');
+  await R.waitFor(() => srv2('jarvis_rezije_url') === 'https://stara-default-rtdb.example.firebasedatabase.app', 'repair pushed', 5000);
+  pass(srv2('jarvis_rezije_url') === 'https://stara-default-rtdb.example.firebasedatabase.app', 'Vraćena vrijednost otišla u oblak (stiže i na druge uređaje)');
+  pass(JSON.parse(R.ls('jarvis_cloud')).prelinkRepaired === true, 'Popravak se radi samo jednom');
   process.exit(0);
 })().catch(e => { console.error('TEST ERROR', e); process.exit(1); });
