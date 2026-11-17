@@ -100,10 +100,10 @@ const expectedUk = (a, b) => { const vt = (b.v - a.v) * PH.c_m3_v + PH.fix_v; co
   visionQueue.push('{"type":"water","value":1290,"confidence":"high","note":""}');
   await waitFor(idle, 'idle'); speechQueue.push('slikaj brojilo vode'); click($('micBtn'));
   await capture(); await sleep(60); await waitFor(idle, 'after water photo');
-  pass(lastText().includes('1.290') && lastText().includes('struje'), 'Pročitana voda, Jarvis traži brojilo struje');
+  pass(lastText().includes('1290') && lastText().includes('struje'), 'Pročitana voda, Jarvis traži brojilo struje');
   visionQueue.push('```json\n{"type":"unknown","value":"12 400","confidence":"high","note":""}\n```');
   click(btn('Struja')); await capture(); await sleep(60); await waitFor(idle, 'after electricity photo');
-  pass(lastText().includes('12.400') && lastText().includes('potvrdi'), 'Nepoznat tip + razmak u broju: ispravno zaključeno da je struja (12400)');
+  pass(lastText().includes('12400') && lastText().includes('potvrdi'), 'Nepoznat tip + razmak u broju: ispravno zaključeno da je struja (12400)');
   await say('da');
   pass(db.entries.length === 4 && db.entries[3].v === 1290 && db.entries[3].k === 12400, '"da" spremilo očitanje s fotografija');
 

@@ -92,12 +92,12 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   console.log('--- 1. "Glavno stanje struje" ---');
   await say('Jarvis, glavno stanje struje');
   let card = lastCard('STANJE BROJILA');
-  pass(card && rows(card).some(r => r.includes('Obračunsko očitanje') && r.includes(MAIN)) && rows(card).some(r => r.includes('Struja') && r.includes('12.100 kWh')), 'Kartica: obračunsko očitanje (ne zadnje kontrolno) — 12.100 kWh');
+  pass(card && rows(card).some(r => r.includes('Obračunsko očitanje') && r.includes(MAIN)) && rows(card).some(r => r.includes('Struja') && r.includes('12100 kWh')), 'Kartica: obračunsko očitanje (ne zadnje kontrolno) — 12100 kWh');
   pass(!rows(card).some(r => r.includes('Kontrolno')), 'Bez kontrolnih očitanja');
-  pass(lastSpoken() === `Glavno stanje struje, prema obračunskom očitanju od ${spokenDate(mainDate)}, je 12.100 kilovatsati.`, 'Glasom: ' + lastSpoken());
+  pass(lastSpoken() === `Glavno stanje struje, prema obračunskom očitanju od ${spokenDate(mainDate)}, je 12100 kilovatsati.`, 'Glasom: ' + lastSpoken());
   pass(geminiCalls === 0, 'Lokalno, bez AI modela');
   await say('koje je obračunsko stanje vode');
-  pass(lastSpoken() === `Glavno stanje vode, prema obračunskom očitanju od ${spokenDate(mainDate)}, je 1.225 kubika.`, '"obračunsko stanje vode": ' + lastSpoken());
+  pass(lastSpoken() === `Glavno stanje vode, prema obračunskom očitanju od ${spokenDate(mainDate)}, je 1225 kubika.`, '"obračunsko stanje vode": ' + lastSpoken());
 
   console.log('--- 2. Kontrolno stanje i stanje brojila ---');
   const kw = 12300 - 12100, dn = days(MAIN, K2), proc = hep(kw, Math.round(dn / 30 * 100) / 100, PH);
@@ -105,15 +105,19 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   card = lastCard('STANJE BROJILA');
   pass(rows(card).some(r => r.includes('Kontrolno očitanje') && r.includes(K2)) && rows(card).some(r => r.includes(`${kw} kWh`) && r.includes(`${dn} dan`)), `Zadnje kontrolno: ${kw} kWh u ${dn} dana od obračuna`);
   pass(rows(card).some(r => r.includes('Procjena troška struje') && r.includes(eurHr(proc))), `Procjena kao u aplikaciji: ${eurHr(proc)}`);
-  pass(lastSpoken().startsWith(`Zadnje kontrolno očitanje od ${spokenDate(k2)}: 12.300 kilovatsati, to je ${kw} od obračunskog`), 'Glasom: ' + lastSpoken());
+  pass(lastSpoken().startsWith(`Zadnje kontrolno očitanje od ${spokenDate(k2)}: 12300 kilovatsati, to je ${kw} od obračunskog`), 'Glasom: ' + lastSpoken());
   await say('stanje brojila');
   card = lastCard('STANJE BROJILA');
-  pass(rows(card).some(r => r.includes('Voda') && r.includes('1.225')) && rows(card).some(r => r.includes('Kontrolno očitanje')), '"stanje brojila": obračunsko (voda i struja) + kontrolno');
+  pass(rows(card).some(r => r.includes('Voda') && r.includes('1225')) && rows(card).some(r => r.includes('Kontrolno očitanje')), '"stanje brojila": obračunsko (voda i struja) + kontrolno');
 
   console.log('--- 3. Tablica i izračun bez kontrolnih ---');
   click($('rezijeBtn')); await waitFor(() => d.querySelector('.rz-table'), 'table');
   const main = d.querySelector('.rz-table:not(.rz-ko-table)'), ko = d.querySelector('.rz-ko-table');
   pass(main.querySelectorAll('tr').length === 3, 'Tablica: 2 razdoblja iz 3 obračunska očitanja (kontrolna izostavljena)');
+  const head = [...main.querySelectorAll('th')].map(t => t.textContent);
+  pass(head.slice(0, 9).join('|') === 'Datum|Stanje vode|Voda m³|Voda €|Stanje struje|Struja kWh|Struja €|Fiksni €|Ukupno €', 'Tablica ima iste stupce kao aplikacija za režije');
+  const firstRow = [...main.querySelectorAll('tr')][1].textContent;
+  pass(firstRow.includes('1225') && firstRow.includes('12100') && !/12\.100|1\.225/.test(firstRow), 'Stanja kao u aplikaciji: 12100, 1225 (bez točke tisućica)');
   pass(ko && ko.querySelectorAll('tr').length === 4 && d.querySelector('.rz-ko-title').textContent.includes('informativno'), 'Posebna tablica s 3 kontrolna očitanja (informativno)');
   const stHep = hep(12100 - 11800, 1, PH), vt = (1225 - 1212) * 1.68, uk = vt + stHep + 10.62;
   pass(main.textContent.replace(/\s+/g, ' ').includes(uk.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })), `Zadnje razdoblje po HEP Plavi: ${eurHr(uk)}`);
@@ -162,9 +166,9 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
 
   console.log('--- 6. Glavno stanje i dalje obračunsko ---');
   await say('glavno stanje struje');
-  pass(lastSpoken().includes('12.100 kilovatsati'), 'Nova kontrolna ne mijenjaju glavno stanje');
+  pass(lastSpoken().includes('12100 kilovatsati'), 'Nova kontrolna ne mijenjaju glavno stanje');
   await say('koliko sam struje potrošio ovaj mjesec');
-  pass(lastCard('STANJE BROJILA').textContent.includes('12.450'), 'AI alat get_meter_status prikazuje zadnje kontrolno');
+  pass(lastCard('STANJE BROJILA').textContent.includes('12450'), 'AI alat get_meter_status prikazuje zadnje kontrolno');
 
   console.log('--- 7. Brisanje kontrolnog (uz lozinku) ---');
   click($('rezijeBtn')); await sleep(50); click(d.querySelector('.rz-tab[data-tab="tablica"]')); await waitFor(() => d.querySelector('.rz-ko-table'), 'ko table');

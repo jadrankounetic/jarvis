@@ -82,7 +82,7 @@ const password = async () => { await waitFor(() => $('pwModal').dataset.open ===
   await say('Jarvis, koliko sam potrošio struje od 4.11.2026. do 9.11.2026.');
   let card = lastCard('POTROŠNJA');
   const c1 = hep(70, Math.round(5 / 30 * 100) / 100, PH);
-  pass(card && rows(card).some(r => r.includes('Od') && r.includes('04.11.2026.') && r.includes('12.430 kWh') && r.includes('kontrolno')), 'Početak: kontrolno 04.11. (12.430 kWh)');
+  pass(card && rows(card).some(r => r.includes('Od') && r.includes('04.11.2026.') && r.includes('12430 kWh') && r.includes('kontrolno')), 'Početak: kontrolno 04.11. (12430 kWh)');
   pass(rows(card).some(r => r.includes('⚡ Potrošeno') && r.includes('70 kWh') && r.includes('5 dana') && r.includes('14,0 kWh/dan')), '70 kWh u 5 dana, 14,0 kWh/dan');
   pass(rows(card).some(r => r.includes('Procjena troška struje') && r.includes(eurHr(c1))), `Procjena po formuli aplikacije: ${eurHr(c1)}`);
   pass(lastSpoken().startsWith(`Od 4. studenoga 2026. do 9. studenoga 2026. potrošeno je 70 kilovatsati struje u 5 dana, oko 14,0 na dan, procjena troška ${eurHr(c1)}.`), 'Glasom: ' + lastSpoken());

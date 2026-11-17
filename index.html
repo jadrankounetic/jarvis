@@ -105,6 +105,7 @@
   @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
   .topbar-right { display: flex; gap: 14px; align-items: center; }
   #settingsModal [hidden], .cloud-dot[hidden] { display: none !important; }
+  .rz-table td.rz-state { color: var(--text-dim); }
   .cloud-dot { font-size: 12px; margin-left: 6px; color: var(--text-dim); }
   .cloud-dot[data-state="ok"] { color: var(--cyan, #4fd1ff); }
   .cloud-dot[data-state="error"] { color: var(--red); }
@@ -1361,7 +1362,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.4';
+  const JARVIS_VERSION = '10.5';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -3832,6 +3833,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   function eur(n) {
     return (n == null || isNaN(n)) ? '—' : n.toLocaleString('hr-HR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
   }
+  // Meter states exactly as entered in the utilities app (no thousands separator: "12390", not
+  // "12.390", which reads like a decimal); kWh used as whole numbers, as the app shows them.
+  function rdg(n) { return n == null || isNaN(n) ? '—' : String(n).replace('.', ','); }
+  function kwh(n) { return n == null || isNaN(n) ? '—' : String(Math.round(n)); }
   function numHr(n, dec = 0) {
     return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('hr-HR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
   }
@@ -3867,15 +3872,15 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     const ko = !!utilDraft.ko;
     const problems = [], warnings = [];
     let preview = null, kpreview = null;
-    if (last && !ko && utilDraft.v != null && utilDraft.v < last.v) problems.push(`Voda ${numHr(utilDraft.v)} m³ je manja od prethodnog očitanja (${numHr(last.v)} m³).`);
-    if (lastAny && utilDraft.k != null && utilDraft.k < lastAny.k) problems.push(`Struja ${numHr(utilDraft.k)} kWh je manja od prethodnog očitanja (${numHr(lastAny.k)} kWh).`);
+    if (last && !ko && utilDraft.v != null && utilDraft.v < last.v) problems.push(`Voda ${rdg(utilDraft.v)} m³ je manja od prethodnog očitanja (${rdg(last.v)} m³).`);
+    if (lastAny && utilDraft.k != null && utilDraft.k < lastAny.k) problems.push(`Struja ${rdg(utilDraft.k)} kWh je manja od prethodnog očitanja (${rdg(lastAny.k)} kWh).`);
     if (last && !ko) {
       if (ent.length >= 3) {
         let sv = 0, sk = 0;
         for (let i = 1; i < ent.length; i++) { sv += ent[i].v - ent[i - 1].v; sk += ent[i].k - ent[i - 1].k; }
         const avgV = sv / (ent.length - 1), avgK = sk / (ent.length - 1);
         if (utilDraft.v != null && avgV > 0 && utilDraft.v - last.v > avgV * 3) warnings.push(`Potrošnja vode (${numHr(utilDraft.v - last.v)} m³) je više od 3× veća od prosjeka — provjeri broj.`);
-        if (utilDraft.k != null && avgK > 0 && utilDraft.k - last.k > avgK * 3) warnings.push(`Potrošnja struje (${numHr(utilDraft.k - last.k)} kWh) je više od 3× veća od prosjeka — provjeri broj.`);
+        if (utilDraft.k != null && avgK > 0 && utilDraft.k - last.k > avgK * 3) warnings.push(`Potrošnja struje (${kwh(utilDraft.k - last.k)} kWh) je više od 3× veća od prosjeka — provjeri broj.`);
       }
       if (utilDraft.v != null && utilDraft.k != null && !problems.length) {
         preview = utilCalc([last, { id: 0, d: utilDraft.d, v: utilDraft.v, k: utilDraft.k, p: data.params }], data.params)[0];
@@ -3957,17 +3962,17 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   function renderUtilDraftCard(check) {
     const d = utilDraft;
     let body = utilRow('Vrsta', d.ko ? 'Kontrolno (samo struja, informativno)' : 'Obračunsko') + utilRow('Datum', d.d)
-      + (d.ko ? '' : utilRow('Voda', d.v != null ? `${numHr(d.v)} m³` : '— čeka'))
-      + utilRow('Struja', d.k != null ? `${numHr(d.k)} kWh` : '— čeka');
+      + (d.ko ? '' : utilRow('Voda', d.v != null ? `${rdg(d.v)} m³` : '— čeka'))
+      + utilRow('Struja', d.k != null ? `${rdg(d.k)} kWh` : '— čeka');
     if (check.last) body += d.ko
-      ? utilRow('Zadnje obračunsko', `${check.last.d} · ${numHr(check.last.k)} kWh`)
-      : utilRow('Prethodno', `${check.last.d} · ${numHr(check.last.v)} m³ · ${numHr(check.last.k)} kWh`);
+      ? utilRow('Zadnje obračunsko', `${check.last.d} · ${rdg(check.last.k)} kWh`)
+      : utilRow('Prethodno', `${check.last.d} · ${rdg(check.last.v)} m³ · ${rdg(check.last.k)} kWh`);
     if (d.ko && check.kpreview && check.kpreview.od) {
-      body += utilRow('Od obračuna', `${numHr(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
+      body += utilRow('Od obračuna', `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
       if (check.kpreview.proc != null) body += utilRow('Procjena troška struje', eur(check.kpreview.proc), 'util-total');
     }
     if (!d.ko && check.preview) {
-      body += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${numHr(check.preview.sk)} kWh`)
+      body += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${kwh(check.preview.sk)} kWh`)
         + utilRow('Voda / Struja / Fiksni', `${eur(check.preview.vt)} / ${eur(check.preview.st)} / ${eur(check.preview.fx)}`)
         + utilRow('Ukupno za razdoblje', eur(check.preview.uk), 'util-total');
     }
@@ -4093,10 +4098,10 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         if (r && r.ko) {
           const c = r.row;
           msg = c && c.od
-            ? `Kontrolno očitanje spremljeno. Od obračunskog očitanja ${c.od} potrošeno je ${numHr(c.kw)} kilovatsati u ${c.dn} ${plural(c.dn, 'dan', 'dana', 'dana')}${c.proc != null ? `, procjena troška struje ${eur(c.proc)}` : ''}.`
+            ? `Kontrolno očitanje spremljeno. Od obračunskog očitanja ${c.od} potrošeno je ${kwh(c.kw)} kilovatsati u ${c.dn} ${plural(c.dn, 'dan', 'dana', 'dana')}${c.proc != null ? `, procjena troška struje ${eur(c.proc)}` : ''}.`
             : 'Kontrolno očitanje spremljeno.';
         } else msg = r
-          ? `Očitanje spremljeno. Potrošeno je ${numHr(r.vm)} kubika vode i ${numHr(r.sk)} kilovatsati struje. Režije za ovo razdoblje su ${eur(r.uk)}.`
+          ? `Očitanje spremljeno. Potrošeno je ${numHr(r.vm)} kubika vode i ${kwh(r.sk)} kilovatsati struje. Režije za ovo razdoblje su ${eur(r.uk)}.`
           : 'Početno očitanje je spremljeno.';
         utilFinalizeCard(utilDraftCard, 'NOVO OČITANJE', '✓ ' + msg);
       }
@@ -4150,7 +4155,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     let msg;
     try {
       const check = await utilSetDraftKind(ko);
-      if (ko) msg = 'Upisujem kao kontrolno očitanje struje.' + (check && check.kpreview && check.kpreview.od && check.kpreview.proc != null ? ` Od obračuna ${numHr(check.kpreview.kw)} kilovatsati, procjena ${eur(check.kpreview.proc)}.` : '');
+      if (ko) msg = 'Upisujem kao kontrolno očitanje struje.' + (check && check.kpreview && check.kpreview.od && check.kpreview.proc != null ? ` Od obračuna ${kwh(check.kpreview.kw)} kilovatsati, procjena ${eur(check.kpreview.proc)}.` : '');
       else msg = 'Upisujem kao obračunsko očitanje.' + (utilDraft && utilDraft.v == null ? ' Reci mi još stanje vode.' : '');
       if (utilDraftComplete() && !(check && check.problems.length)) msg += ' Reci "potvrdi" za spremanje.';
     } catch (e) { msg = 'Nije uspjelo: ' + e.message; }
@@ -4167,24 +4172,24 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       if (!main) { parts.push('Još nema obračunskog očitanja.'); model.push('No billing reading yet.'); }
       else {
         body += utilRow('Obračunsko očitanje', main.d);
-        if (wantK) body += utilRow('⚡ Struja', `${numHr(main.k)} kWh`, q.what === 'k' ? 'util-total' : '');
-        if (wantV) body += utilRow('💧 Voda', `${numHr(main.v)} m³`, q.what === 'v' ? 'util-total' : '');
-        if (q.what === 'k') parts.push(`Glavno stanje struje, prema obračunskom očitanju od ${hrDateSpoken(main.d)}, je ${numHr(main.k)} kilovatsati.`);
-        else if (q.what === 'v') parts.push(`Glavno stanje vode, prema obračunskom očitanju od ${hrDateSpoken(main.d)}, je ${numHr(main.v)} kubika.`);
-        else parts.push(`Obračunsko očitanje od ${hrDateSpoken(main.d)}: voda ${numHr(main.v)} kubika, struja ${numHr(main.k)} kilovatsati.`);
+        if (wantK) body += utilRow('⚡ Struja', `${rdg(main.k)} kWh`, q.what === 'k' ? 'util-total' : '');
+        if (wantV) body += utilRow('💧 Voda', `${rdg(main.v)} m³`, q.what === 'v' ? 'util-total' : '');
+        if (q.what === 'k') parts.push(`Glavno stanje struje, prema obračunskom očitanju od ${hrDateSpoken(main.d)}, je ${rdg(main.k)} kilovatsati.`);
+        else if (q.what === 'v') parts.push(`Glavno stanje vode, prema obračunskom očitanju od ${hrDateSpoken(main.d)}, je ${rdg(main.v)} kubika.`);
+        else parts.push(`Obračunsko očitanje od ${hrDateSpoken(main.d)}: voda ${rdg(main.v)} kubika, struja ${rdg(main.k)} kilovatsati.`);
         model.push(`Latest billing (obračunsko) reading ${main.d}: water ${main.v} m³, electricity ${main.k} kWh.`);
       }
     }
     if (q.kind !== 'main' && wantK) {
       if (ctrl) {
-        body += `<div class="util-sep"></div>` + utilRow('Kontrolno očitanje', ctrl.date) + utilRow('⚡ Struja', `${numHr(ctrl.st)} kWh`);
+        body += `<div class="util-sep"></div>` + utilRow('Kontrolno očitanje', ctrl.date) + utilRow('⚡ Struja', `${rdg(ctrl.st)} kWh`);
         if (ctrl.od) {
-          body += utilRow('Od obračuna', `${numHr(ctrl.kw)} kWh · ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')} · ${numHr(ctrl.dan, 1)} kWh/dan`);
+          body += utilRow('Od obračuna', `${kwh(ctrl.kw)} kWh · ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')} · ${numHr(ctrl.dan, 1)} kWh/dan`);
           if (ctrl.proc != null) body += utilRow('Procjena troška struje', eur(ctrl.proc), 'util-total');
-          parts.push(`${q.kind === 'ctrl' ? 'Zadnje kontrolno' : 'Kontrolno'} očitanje od ${hrDateSpoken(ctrl.date)}: ${numHr(ctrl.st)} kilovatsati, to je ${numHr(ctrl.kw)} od obračunskog u ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')}${ctrl.proc != null ? `, procjena troška ${eur(ctrl.proc)}` : ''}.`);
+          parts.push(`${q.kind === 'ctrl' ? 'Zadnje kontrolno' : 'Kontrolno'} očitanje od ${hrDateSpoken(ctrl.date)}: ${rdg(ctrl.st)} kilovatsati, to je ${kwh(ctrl.kw)} od obračunskog u ${ctrl.dn} ${plural(ctrl.dn, 'dan', 'dana', 'dana')}${ctrl.proc != null ? `, procjena troška ${eur(ctrl.proc)}` : ''}.`);
           model.push(`Latest control (kontrolno) reading ${ctrl.date}: ${ctrl.st} kWh, ${ctrl.kw} kWh in ${ctrl.dn} days since the billing reading ${ctrl.od}${ctrl.proc != null ? `, estimated electricity cost ${ctrl.proc.toFixed(2)} €` : ''}.`);
         } else {
-          parts.push(`Kontrolno očitanje od ${hrDateSpoken(ctrl.date)}: ${numHr(ctrl.st)} kilovatsati.`);
+          parts.push(`Kontrolno očitanje od ${hrDateSpoken(ctrl.date)}: ${rdg(ctrl.st)} kilovatsati.`);
           model.push(`Latest control reading ${ctrl.date}: ${ctrl.st} kWh.`);
         }
       } else if (q.kind === 'ctrl') {
@@ -4281,22 +4286,22 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (r.k) {
       const k = r.k;
       body += `<div class="util-sep"></div>`
-        + utilRow('⚡ Od', `${k.a.e.d} · ${numHr(k.a.e.k)} kWh · ${kindHr(k.a.e)}`)
-        + utilRow('⚡ Do', `${k.b.e.d} · ${numHr(k.b.e.k)} kWh · ${kindHr(k.b.e)}`)
-        + utilRow('⚡ Potrošeno', `${numHr(k.kw)} kWh · ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')} · ${numHr(k.perDay, 1)} kWh/dan`)
+        + utilRow('⚡ Od', `${k.a.e.d} · ${rdg(k.a.e.k)} kWh · ${kindHr(k.a.e)}`)
+        + utilRow('⚡ Do', `${k.b.e.d} · ${rdg(k.b.e.k)} kWh · ${kindHr(k.b.e)}`)
+        + utilRow('⚡ Potrošeno', `${kwh(k.kw)} kWh · ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')} · ${numHr(k.perDay, 1)} kWh/dan`)
         + utilRow('Procjena troška struje', eur(k.cost), 'util-total');
       const sub = [];
       if (k.a.off) sub.push(`za ${hrDateSpoken(utilHrFromDate(r.from))} nema očitanja, pa sam uzeo ono od ${hrDateSpoken(k.a.e.d)}`);
       if (k.b.off) sub.push(`za ${hrDateSpoken(utilHrFromDate(r.to))} nema očitanja, pa sam uzeo ono od ${hrDateSpoken(k.b.e.d)}`);
-      parts.push(`Od ${hrDateSpoken(k.a.e.d)} do ${hrDateSpoken(k.b.e.d)} potrošeno je ${numHr(k.kw)} kilovatsati struje u ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')}, oko ${numHr(k.perDay, 1)} na dan, procjena troška ${eur(k.cost)}.`
+      parts.push(`Od ${hrDateSpoken(k.a.e.d)} do ${hrDateSpoken(k.b.e.d)} potrošeno je ${kwh(k.kw)} kilovatsati struje u ${k.days} ${plural(k.days, 'dan', 'dana', 'dana')}, oko ${numHr(k.perDay, 1)} na dan, procjena troška ${eur(k.cost)}.`
         + (sub.length ? ' Napomena: ' + sub.join('; ') + '.' : ''));
       model.push(`Electricity: ${k.a.e.d} (${kindHr(k.a.e)}) ${k.a.e.k} kWh → ${k.b.e.d} (${kindHr(k.b.e)}) ${k.b.e.k} kWh = ${k.kw} kWh in ${k.days} days (${k.perDay.toFixed(1)} kWh/day), estimated electricity cost ${k.cost.toFixed(2)} € (prices of the later reading, HEP model as in the utilities app).${k.a.off || k.b.off ? ' Readings used are the nearest to the asked dates.' : ''}`);
     }
     if (r.v) {
       const v = r.v;
       body += `<div class="util-sep"></div>`
-        + utilRow('💧 Od', `${v.a.e.d} · ${numHr(v.a.e.v)} m³`)
-        + utilRow('💧 Do', `${v.b.e.d} · ${numHr(v.b.e.v)} m³`)
+        + utilRow('💧 Od', `${v.a.e.d} · ${rdg(v.a.e.v)} m³`)
+        + utilRow('💧 Do', `${v.b.e.d} · ${rdg(v.b.e.v)} m³`)
         + utilRow('💧 Potrošeno', `${numHr(v.m3)} m³ · ${v.days} ${plural(v.days, 'dan', 'dana', 'dana')}`)
         + utilRow('Procjena troška vode', eur(v.cost), 'util-total');
       parts.push(`Vode od ${hrDateSpoken(v.a.e.d)} do ${hrDateSpoken(v.b.e.d)}: ${numHr(v.m3)} kubika, ${eur(v.cost)}.`);
@@ -4305,7 +4310,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     if (!r.k && !r.v) parts.push(r.notes.join(' ') || 'Za to razdoblje nema očitanja.');
     else if (r.notes.length && meter === 'both') model.push(r.notes.join(' '));
     if (r.rows.length) {
-      const rows = r.rows.slice(-40).map(e => `<tr><td>${escapeHtml(e.d)}</td><td>${e.ko ? 'kontrolno' : 'obračunsko'}</td><td>${e.ko ? '—' : numHr(e.v)}</td><td>${numHr(e.k)}</td></tr>`).join('');
+      const rows = r.rows.slice(-40).map(e => `<tr><td>${escapeHtml(e.d)}</td><td>${e.ko ? 'kontrolno' : 'obračunsko'}</td><td>${e.ko ? '—' : rdg(e.v)}</td><td>${rdg(e.k)}</td></tr>`).join('');
       body += `<div class="util-sep"></div><div class="rz-scroll"><table class="util-table"><tr><th>Datum</th><th>Vrsta</th><th>Voda m³</th><th>Struja kWh</th></tr>${rows}</table></div>`;
       model.push('All readings in this range (date, type, water m³, electricity kWh): ' + r.rows.map(e => `${e.d} ${e.ko ? 'control' : 'billing'} ${e.ko ? '-' : e.v} ${e.k}`).join('; ') + '.');
     }
@@ -4373,8 +4378,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
   // Asks for the delete password, then removes one entry. Returns true if deleted.
   async function utilDeleteEntry(entry) {
     const ok = await requirePassword(entry.ko
-      ? `Obrisati kontrolno očitanje ${entry.d} (struja ${numHr(entry.k)} kWh)?`
-      : `Obrisati očitanje ${entry.d} (voda ${numHr(entry.v)} m³, struja ${numHr(entry.k)} kWh)?`);
+      ? `Obrisati kontrolno očitanje ${entry.d} (struja ${rdg(entry.k)} kWh)?`
+      : `Obrisati očitanje ${entry.d} (voda ${rdg(entry.v)} m³, struja ${rdg(entry.k)} kWh)?`);
     if (!ok) return false;
     const raw = await utilFetch('/entries');
     const keys = Array.isArray(raw) ? raw.map((x, i) => (x ? String(i) : null)).filter(Boolean) : Object.keys(raw || {});
@@ -4497,18 +4502,18 @@ Rules:
     }
     if (!type) {
       await say(givenBase64
-        ? `Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "brojilo vode" ili "brojilo struje".`
-        : `Pročitao sam ${numHr(reading.value)}, ali ne znam je li to voda ili struja. Reci "slikaj brojilo vode" ili "slikaj brojilo struje".`);
+        ? `Pročitao sam ${rdg(reading.value)}, ali ne znam je li to voda ili struja. Reci "brojilo vode" ili "brojilo struje".`
+        : `Pročitao sam ${rdg(reading.value)}, ali ne znam je li to voda ili struja. Reci "slikaj brojilo vode" ili "slikaj brojilo struje".`);
       return;
     }
     let check;
     try { check = await utilMergeDraft(type === 'v' ? { v: reading.value } : ko ? { k: reading.value, ko: true } : { k: reading.value }); }
     catch (err) { await say(err.message, true); return; }
 
-    const what = type === 'v' ? `${numHr(reading.value)} kubika na brojilu vode` : `${numHr(reading.value)} kilovatsati na brojilu struje`;
+    const what = type === 'v' ? `${rdg(reading.value)} kubika na brojilu vode` : `${rdg(reading.value)} kilovatsati na brojilu struje`;
     let next;
     if (check.problems.length) next = check.problems.join(' ') + ' Slikaj ponovno ili mi reci ispravan broj.';
-    else if (utilDraft.ko) next = (check.kpreview && check.kpreview.od ? `Kontrolno: od obračuna ${numHr(check.kpreview.kw)} kilovatsati${check.kpreview.proc != null ? `, procjena ${eur(check.kpreview.proc)}` : ''}. ` : 'Kontrolno očitanje. ') + 'Reci "potvrdi" za spremanje ili "odustani".';
+    else if (utilDraft.ko) next = (check.kpreview && check.kpreview.od ? `Kontrolno: od obračuna ${kwh(check.kpreview.kw)} kilovatsati${check.kpreview.proc != null ? `, procjena ${eur(check.kpreview.proc)}` : ''}. ` : 'Kontrolno očitanje. ') + 'Reci "potvrdi" za spremanje ili "odustani".';
     else if (utilDraft.v == null) next = givenBase64 ? 'Sada slikaj brojilo vode ili ga odaberi iz galerije.' : 'Sada slikaj brojilo vode.';
     else if (utilDraft.k == null) next = givenBase64 ? 'Sada slikaj brojilo struje ili ga odaberi iz galerije.' : 'Sada slikaj brojilo struje.';
     else next = (check.preview ? `Režije za ovo razdoblje bit će ${eur(check.preview.uk)}. ` : '') + 'Reci "potvrdi" za spremanje ili "odustani".';
@@ -6594,20 +6599,20 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const res = utilCalc(data.entries, data.params);
     if (!res.length) return `<div class="rz-empty">Za izračun trebaju barem dva očitanja.<br>Dodaj ih u kartici Unos ili reci "slikaj brojilo vode".</div>`;
     const rows = res.slice().reverse().map(r => `<tr>
-        <td>${escapeHtml(r.date)}</td><td>${numHr(r.vm, 2)}</td><td>${numHr(r.vt, 2)}</td>
-        <td>${numHr(r.sk)}</td><td>${numHr(r.st, 2)}</td><td>${numHr(r.fx, 2)}</td>
+        <td>${escapeHtml(r.date)}</td><td class="rz-state">${rdg(r.sv)}</td><td>${numHr(r.vm, 2)}</td><td>${numHr(r.vt, 2)}</td>
+        <td class="rz-state">${rdg(r.sk2)}</td><td>${kwh(r.sk)}</td><td>${numHr(r.st, 2)}</td><td>${numHr(r.fx, 2)}</td>
         <td class="util-uk">${numHr(r.uk, 2)}</td>
         <td><button class="rz-del" type="button" data-id="${r.id}" aria-label="Obriši očitanje ${escapeHtml(r.date)}">×</button></td></tr>`).join('');
     return `<div class="rz-scroll"><table class="util-table rz-table">
-        <tr><th>Datum</th><th>Voda m³</th><th>Voda €</th><th>Struja kWh</th><th>Struja €</th><th>Fiksni €</th><th>Ukupno €</th><th></th></tr>
+        <tr><th>Datum</th><th>Stanje vode</th><th>Voda m³</th><th>Voda €</th><th>Stanje struje</th><th>Struja kWh</th><th>Struja €</th><th>Fiksni €</th><th>Ukupno €</th><th></th></tr>
         ${rows}</table></div>` + rzControlsHtml(data);
   }
   function rzControlsHtml(data) {
     const kon = utilControls(data.entries, data.params);
     if (!kon.length) return '';
     const rows = kon.slice().reverse().map(r => `<tr>
-        <td>${escapeHtml(r.date)}</td><td>${numHr(r.st)}</td><td>${r.od ? escapeHtml(r.od) : '—'}</td>
-        <td>${r.od ? numHr(r.kw) : '—'}</td><td>${r.od ? r.dn : '—'}</td><td>${r.od && r.dn > 0 ? numHr(r.dan, 2) : '—'}</td>
+        <td>${escapeHtml(r.date)}</td><td>${rdg(r.st)}</td><td>${r.od ? escapeHtml(r.od) : '—'}</td>
+        <td>${r.od ? kwh(r.kw) : '—'}</td><td>${r.od ? r.dn : '—'}</td><td>${r.od && r.dn > 0 ? numHr(r.dan, 2) : '—'}</td>
         <td class="util-uk">${r.od && r.proc != null ? numHr(r.proc, 2) : '—'}</td>
         <td><button class="rz-del" type="button" data-id="${r.id}" aria-label="Obriši kontrolno očitanje ${escapeHtml(r.date)}">×</button></td></tr>`).join('');
     return `<div class="rz-section rz-ko-title">Kontrolna očitanja struje <span class="rz-ko-tag">informativno</span></div>
@@ -6630,7 +6635,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       const first = !e.ko && e === firstMain;
       return `<div class="reminder-item${e.ko ? ' rz-ko-item' : ''}">
           <div><div>${escapeHtml(e.d)}${first ? ' (početno)' : ''}${e.ko ? ' <span class="rz-ko-tag">kontrolno</span>' : ''}</div>
-          <div class="reminder-time">${e.ko ? `struja ${numHr(e.k)} kWh` : `voda ${numHr(e.v)} m³ · struja ${numHr(e.k)} kWh`}</div></div>
+          <div class="reminder-time">${e.ko ? `struja ${rdg(e.k)} kWh` : `voda ${rdg(e.v)} m³ · struja ${rdg(e.k)} kWh`}</div></div>
           ${first ? '' : `<button class="rz-del" type="button" data-id="${e.id}" aria-label="Obriši očitanje ${escapeHtml(e.d)}">×</button>`}
         </div>`;
     }).join('');
@@ -6685,10 +6690,10 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const check = utilValidateDraft(data);
     let h = '';
     if (utilDraft.ko && check.kpreview && check.kpreview.od) {
-      h += utilRow('Od obračuna', `${numHr(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
+      h += utilRow('Od obračuna', `${kwh(check.kpreview.kw)} kWh · ${check.kpreview.dn} ${plural(check.kpreview.dn, 'dan', 'dana', 'dana')} · ${numHr(check.kpreview.dan, 1)} kWh/dan`);
       if (check.kpreview.proc != null) h += utilRow('Procjena troška struje', eur(check.kpreview.proc), 'util-total');
     } else if (!utilDraft.ko && check.preview) {
-      h += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${numHr(check.preview.sk)} kWh`)
+      h += utilRow('Potrošnja', `${numHr(check.preview.vm)} m³ · ${kwh(check.preview.sk)} kWh`)
         + utilRow('Voda / Struja / Fiksni', `${eur(check.preview.vt)} / ${eur(check.preview.st)} / ${eur(check.preview.fx)}`)
         + utilRow('Ukupno za razdoblje', eur(check.preview.uk), 'util-total');
     } else if (!utilDraft.ko && !check.last && utilDraft.v != null && utilDraft.k != null) {

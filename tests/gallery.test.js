@@ -104,7 +104,7 @@ const lastVision = () => G.vision[G.vision.length - 1];
   G.visionQueue.push('{"type":"water","value":1262,"confidence":"high","note":""}');
   await pick('brojilo.jpg');
   await waitFor(() => cards('NOVO OČITANJE').length, 'meter draft');
-  pass(cards('NOVO OČITANJE').length === 1 && cards('NOVO OČITANJE')[0].textContent.includes('1.262'), 'Brojilo očitano sa slike → nacrt očitanja (ništa nije spremljeno bez potvrde)');
+  pass(cards('NOVO OČITANJE').length === 1 && cards('NOVO OČITANJE')[0].textContent.includes('1262'), 'Brojilo očitano sa slike → nacrt očitanja (ništa nije spremljeno bez potvrde)');
   pass(getUserMediaCalls === 0 && cards('GALERIJA').length === 0, 'Bez kamere; kartica galerije maknuta');
   pass(!d.querySelector('.card-util .util-actions') || cards('IZ GALERIJE').length === 2, 'Slika iz galerije prikazana u razgovoru');
   await say('odustani');
