@@ -311,10 +311,27 @@
 
   .mode-badge { animation: none; color: var(--cyan-bright); border-color: var(--cyan); letter-spacing: 0.08em; }
   /* Quiz card */
-  .quiz-q { color: var(--cyan-bright); font-size: 13px; line-height: 1.4; padding: 2px 0 4px; }
-  .quiz-opt { color: var(--text); font-size: 12px; padding: 2px 0; }
-  .quiz-opt b { color: var(--gold); display: inline-block; width: 18px; }
-  .util-actions button.quiz-btn { flex: 1 1 18%; font-size: 12px; }
+  .quiz-stats { display: flex; gap: 14px; font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 0.08em; color: var(--text); }
+  .quiz-ok { color: var(--cyan-bright); }
+  .quiz-bad { color: var(--gold); }
+  .quiz-dim { color: var(--text-dim); margin-left: auto; }
+  .quiz-last { font-size: 11px; line-height: 1.35; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .quiz-q { color: var(--cyan-bright); font-size: 15px; line-height: 1.4; padding: 4px 0 2px; }
+  .quiz-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .quiz-opt { display: flex; gap: 8px; align-items: center; width: 100%; min-height: 46px; text-align: left; padding: 8px 10px; background: transparent;
+    border: 1px solid var(--border-strong); border-radius: 3px; color: var(--text); font-family: inherit; font-size: 14px; cursor: pointer; }
+  .quiz-opt b { color: var(--gold); font-family: 'Orbitron', sans-serif; font-size: 12px; min-width: 14px; }
+  .quiz-opt:active { background: rgba(var(--gold-rgb), 0.15); border-color: var(--gold); }
+  /* While a quiz runs the reactor shrinks so the whole question fits on a phone screen */
+  .reactor-wrap { transition: width 0.3s ease; }
+  body.quiz-on .reactor-wrap { width: min(84px, 22vw); margin: 0 0 2px; }
+  .mode-badge, .wake-badge { white-space: nowrap; }
+  @media (max-width: 440px) { .mode-badge-t { display: none; } } /* phone: only the icon, the top bar stays on one line */
+  .quiz-final { color: var(--gold); font-size: 14px; padding: 4px 0; }
+  .quiz-setup-l { color: var(--text-dim); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding-top: 2px; }
+  .quiz-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .quiz-chip { padding: 7px 11px; background: transparent; border: 1px solid var(--border-strong); border-radius: 3px; color: var(--text); font-family: inherit; font-size: 12px; cursor: pointer; }
+  .quiz-chip.on { border-color: var(--gold); color: var(--gold); background: rgba(var(--gold-rgb), 0.1); }
 
   /* Reminders list (Settings) */
   .reminders-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
@@ -776,6 +793,7 @@
     </div>
     <div class="topbar-right">
       <button class="icon-btn" id="rezijeBtn" title="Režije">⌂</button>
+      <button class="icon-btn icon-btn-small" id="quizBtn" title="Kviz" aria-label="Kviz">◎</button>
       <button class="icon-btn icon-btn-small" id="exportBtn" title="Izvezi razgovor" aria-label="Izvezi razgovor">⇪</button>
       <button class="icon-btn icon-btn-small" id="clearBtn" title="Clear conversation">⟲</button>
       <button class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
@@ -1107,6 +1125,16 @@
         <option value="dvor">👑 Dvorski engleski — prevodi sve što kažeš</option>
       </select>
     </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label">Kviz s glasom</div>
+        <div class="toggle-desc">Jarvis čita pitanja naglas i sluša odgovore. Isključeno: kviz se igra tiho, dodirom (čekaonica, kafić). Kviz se pokreće tipkom ◎ gore ili glasom ("igrajmo kviz").</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="quizVoiceToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
 
     <h3>Memory</h3>
     <div class="field">
@@ -1380,7 +1408,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.7';
+  const JARVIS_VERSION = '10.8';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -3079,6 +3107,7 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       <div class="msg-text"></div>`;
     div.querySelector('.msg-text').textContent = text;
     transcript.appendChild(div);
+    pinQuiz();
     transcript.scrollTop = transcript.scrollHeight;
     return div;
   }
@@ -3992,9 +4021,13 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
         bar.appendChild(btn);
       });
     }
-    if (!card.isConnected) transcript.appendChild(card);
+    if (!card.isConnected) { transcript.appendChild(card); pinQuiz(); }
     transcript.scrollTop = transcript.scrollHeight;
     return card;
+  }
+  // A running quiz stays the last thing on screen, below anything said in between.
+  function pinQuiz() {
+    if (quiz && !quiz.finished && quiz.card && quiz.card.isConnected && transcript.lastElementChild !== quiz.card) transcript.appendChild(quiz.card);
   }
   function utilRow(label, value, cls) {
     return `<div class="util-row ${cls || ''}"><span class="util-l">${escapeHtml(label)}</span><span class="util-v">${escapeHtml(value)}</span></div>`;
@@ -6497,7 +6530,9 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   function refreshModeBadge() {
     const b = $('modeBadge'); if (!b) return;
     const m = MODES[state.mode] || MODES.normal;
-    b.textContent = m.badge; b.style.display = m.badge ? '' : 'none';
+    const [icon, ...name] = m.badge.split(' ');
+    b.innerHTML = m.badge ? `${icon}<span class="mode-badge-t"> ${escapeHtml(name.join(' '))}</span>` : '';
+    b.style.display = m.badge ? '' : 'none';
     b.title = m.label;
   }
   function setMode(mode) {
@@ -6595,8 +6630,18 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   }
 
   // ---------- Quiz against Jarvis ----------
-  let quiz = null; // { qs: [{ q, a: [4], c, e }], i, score, topic, card, lang, answered }
+  // Played on one card that always stays at the bottom of the screen: the current question with big
+  // answer buttons, answered questions disappear and only the statistics stay. Silent by default
+  // (waiting room, café — tap to answer); "Kviz s glasom" makes Jarvis read it aloud and listen.
+  var quiz = null; // var, not let: addMessage() → pinQuiz() may run before this line. { qs: [{ q, a: [4], c, e }], i, score, wrong, skipped, topic, voice, card, lang, last, final, finished, done }
+  let quizSetupCard = null;
+  const quizSetup = { topic: '', count: 5 };
+  const QUIZ_TOPICS = [['', 'Opća kultura'], ['povijest', 'Povijest'], ['zemljopis', 'Zemljopis'], ['znanost', 'Znanost'], ['sport', 'Sport'], ['film i glazba', 'Film i glazba'], ['Hrvatska', 'Hrvatska']];
   const QUIZ_SYSTEM = 'You write pub-quiz questions in Croatian. Reply with JSON only (no markdown): an array of objects {"q": question, "a": [four short answer options], "c": index 0-3 of the correct option, "e": one short sentence explaining the answer}. Facts must be correct and unambiguous; exactly one option is right; mix easy and medium difficulty; vary the position of the correct option.';
+  const QUIZ_LETTERS = ['A', 'B', 'C', 'D'];
+  function quizVoiceDefault() { return localStorage.getItem('jarvis_quiz_voice') === 'true'; }
+  function setQuizVoiceDefault(on) { try { localStorage.setItem('jarvis_quiz_voice', String(!!on)); } catch {} }
+  function quizBest() { return parseInt(localStorage.getItem('jarvis_quiz_best') || '0', 10) || 0; }
   function quizSeen() { try { return JSON.parse(localStorage.getItem('jarvis_quiz_seen') || '[]'); } catch { return []; } }
   function parseQuizJson(text) {
     const m = String(text).replace(/```(?:json)?/gi, '').match(/\[[\s\S]*\]/);
@@ -6606,34 +6651,100 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       .map(x => ({ q: x.q.trim(), a: x.a.map(s => String(s).trim()), c: x.c, e: String(x.e || '').trim() }));
   }
   function matchQuizStart(t) {
-    const x = normText(t).replace(/[.!?]+$/, '');
+    let x = normText(t).replace(/[.!?]+$/, '');
     if (!/\bkviz\w*\b/.test(x)) return null;
-    if (!/^(kviz|igra\w*|zaigra\w*|ajmo|hajmo|idemo|pokreni|zapocni|zelim|hocu|daj|napravi|moze|ajde|kreni|novi)\b/.test(x)) return null;
+    if (!/^(kviz|igra\w*|zaigra\w*|ajmo|hajmo|idemo|pokreni|zapocni|zelim|hocu|daj|napravi|moze|ajde|kreni|novi|tihi|glasovni)\b/.test(x)) return null;
+    // "glasovni kviz" / "kviz naglas" and "tihi kviz" / "kviz bez glasa" override the setting for this game
+    const voice = /\b(glasovn\w*|naglas|na glas|s glasom|sa glasom)\b/.test(x) ? true : /\b(tih\w*|tiho|bez glasa)\b/.test(x) ? false : undefined;
+    x = x.replace(/\b(glasovn\w*|naglas|na glas|s glasom|sa glasom|tih\w*|tiho|bez glasa)\b/g, ' ').replace(/\s+/g, ' ').trim();
     const n = /\b(\d{1,2})\s+pitanj/.exec(x);
     const topic = /\bkviz\w*\s+(?:o|iz|na temu|o temi)\s+(.+?)(?:\s+(?:od|sa|s)\s+\d+\s+pitanj\w*)?$/.exec(x);
-    return { count: Math.min(15, Math.max(3, n ? parseInt(n[1], 10) : 5)), topic: topic ? topic[1].trim() : '' };
+    return { count: Math.min(15, Math.max(3, n ? parseInt(n[1], 10) : 5)), topic: topic ? topic[1].trim() : '', voice };
   }
-  const QUIZ_LETTERS = ['A', 'B', 'C', 'D'];
   function quizQuestionSpoken(q, i, n) { return `Pitanje ${i + 1} od ${n}. ${q.q} ${q.a.map((o, k) => `${QUIZ_LETTERS[k]}: ${o}.`).join(' ')}`; }
-  function renderQuizCard(lastLine) {
-    const n = quiz.qs.length;
-    let body = '';
-    if (lastLine) body += `<div class="util-done">${escapeHtml(lastLine)}</div>`;
-    if (quiz.i < n) {
+  function quizPinToBottom(card) { // the quiz is always the last thing on screen
+    if (!card) return;
+    transcript.appendChild(card);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+  function renderQuiz() {
+    const n = quiz.qs.length, over = quiz.i >= n;
+    let body = `<div class="quiz-stats"><span class="quiz-ok">✓ ${quiz.score}</span><span class="quiz-bad">✗ ${quiz.wrong}</span><span>↷ ${quiz.skipped}</span><span class="quiz-dim">rekord ${quizBest()}</span></div>`;
+    if (quiz.last) body += `<div class="quiz-last ${quiz.last.ok ? 'quiz-ok' : 'quiz-bad'}">${escapeHtml(quiz.last.text)}</div>`;
+    if (!over) {
       const q = quiz.qs[quiz.i];
-      body += `<div class="quiz-q">${escapeHtml(q.q)}</div>` + q.a.map((o, k) => `<div class="quiz-opt"><b>${QUIZ_LETTERS[k]}</b> ${escapeHtml(o)}</div>`).join('');
-    }
-    const title = quiz.i < n ? `KVIZ · ${quiz.i + 1}/${n} · ${quiz.score} ${plural(quiz.score, 'bod', 'boda', 'bodova')}` : `KVIZ · REZULTAT ${quiz.score}/${quiz.done ?? n}`;
-    const buttons = quiz.i < n
-      ? [...QUIZ_LETTERS.map((L, k) => ({ label: L, cls: 'quiz-btn', onClick: () => quizAnswer(L, k, quiz.lang) })),
-        { label: 'Preskoči', onClick: () => quizAnswer('Preskoči', -1, quiz.lang) }, { label: 'Kraj', cls: 'util-cancel', onClick: () => quizEnd('Kraj', quiz.lang) }]
-      : [{ label: 'Nova igra', cls: 'util-save', onClick: () => voiceQuizStart('Nova igra kviza', { count: n, topic: quiz.topic }, quiz.lang) }];
+      body += `<div class="quiz-q">${escapeHtml(q.q)}</div><div class="quiz-opts">`
+        + q.a.map((o, k) => `<button type="button" class="quiz-opt" data-k="${k}"><b>${QUIZ_LETTERS[k]}</b><span>${escapeHtml(o)}</span></button>`).join('') + '</div>';
+    } else body += `<div class="quiz-final">${escapeHtml(quiz.final || '')}</div>`;
+    const title = over ? `KVIZ · REZULTAT ${quiz.score}/${quiz.done}` : `KVIZ · ${quiz.i + 1}/${n}${quiz.topic ? ' · ' + escapeHtml(quiz.topic.toUpperCase()) : ''}`;
+    const voiceBtn = { label: quiz.voice ? '🔊 Glas' : '🔇 Tiho', cls: 'quiz-voice', onClick: quizToggleVoice };
+    const buttons = over
+      ? [{ label: 'Nova igra', cls: 'util-save', onClick: () => quizStart(null, { count: n, topic: quiz.topic, voice: quiz.voice }, quiz.lang) },
+        { label: 'Zatvori', cls: 'util-cancel', onClick: () => { if (quiz && quiz.card) quiz.card.remove(); } }]
+      : [{ label: 'Preskoči', onClick: () => quizAnswer(-1) }, voiceBtn, { label: 'Kraj', cls: 'util-cancel', onClick: () => quizEnd() }];
     quiz.card = utilCard(quiz.card, title, body, buttons, '🎯');
     quiz.card.classList.add('card-quiz');
+    document.body.classList.toggle('quiz-on', !over);
+    quiz.card.querySelectorAll('.quiz-opt').forEach(b => b.addEventListener('click', () => quizAnswer(parseInt(b.dataset.k, 10))));
+    quizPinToBottom(quiz.card);
   }
-  async function voiceQuizStart(userText, opts, lang) {
+  async function quizSay(text) {
+    if (!quiz || !quiz.voice) return;
+    await speak(text, quiz.lang);
+  }
+  function quizListen() { // voice game: open the mic for the answer
+    setTimeout(() => { if (quiz && quiz.voice && quiz.i < quiz.qs.length && !state.recognizing && !state.processing && !state.speaking) { try { startListening(); } catch {} } }, 300);
+  }
+  function quizIdle() { // silent game: a spoken answer must not leave Jarvis "listening"
+    if (state.speaking || state.processing || state.recognizing) return;
+    setState('idle'); updateMic(); resumeWakeWordIfEnabled();
+  }
+  async function quizStopSpeaking() {
+    if (!state.speaking) return;
+    interruptSpeech();
+    for (let w = 0; state.speaking && w < 20; w++) await new Promise(r => setTimeout(r, 50));
+  }
+  function quizToggleVoice() {
+    if (!quiz) return;
+    quiz.voice = !quiz.voice;
+    setQuizVoiceDefault(quiz.voice); // remembered as the default for the next game too
+    const s = $('quizVoiceToggle'); if (s) s.checked = quiz.voice;
+    renderQuiz();
+    if (!quiz.voice) { interruptSpeech(); return; }
+    if (quiz.i < quiz.qs.length) quizSay(quizQuestionSpoken(quiz.qs[quiz.i], quiz.i, quiz.qs.length)).then(quizListen);
+  }
+
+  // Tap on ◎ in the top bar: choose topic and number of questions, no voice needed.
+  function showQuizSetup() {
+    if (quizSetupCard) quizSetupCard.remove();
+    const chip = (group, v, label) => `<button type="button" class="quiz-chip${String(quizSetup[group]) === String(v) ? ' on' : ''}" data-group="${group}" data-v="${escapeHtml(String(v))}">${escapeHtml(String(label))}</button>`;
+    const body = `<div class="quiz-setup-l">Tema</div><div class="quiz-chips">${QUIZ_TOPICS.map(([v, l]) => chip('topic', v, l)).join('')}</div>`
+      + `<div class="quiz-setup-l">Broj pitanja</div><div class="quiz-chips">${[5, 10, 15].map(c => chip('count', c, c)).join('')}</div>`;
+    const card = quizSetupCard = utilCard(null, 'KVIZ', body, [
+      { label: 'Kreni', cls: 'util-save', onClick: () => { card.remove(); quizStart(null, { count: quizSetup.count, topic: quizSetup.topic }, currentLang()); } },
+      { label: quizVoiceDefault() ? '🔊 Glas' : '🔇 Tiho', cls: 'quiz-voice', onClick: (e) => {
+        const on = !quizVoiceDefault(); setQuizVoiceDefault(on);
+        const s = $('quizVoiceToggle'); if (s) s.checked = on;
+        e.currentTarget.textContent = on ? '🔊 Glas' : '🔇 Tiho';
+      } },
+      { label: 'Zatvori', cls: 'util-cancel', onClick: () => card.remove() },
+    ], '🎯');
+    card.classList.add('card-quiz');
+    card.querySelectorAll('.quiz-chip').forEach(b => b.addEventListener('click', () => {
+      const g = b.dataset.group;
+      quizSetup[g] = g === 'count' ? parseInt(b.dataset.v, 10) : b.dataset.v;
+      card.querySelectorAll(`.quiz-chip[data-group="${g}"]`).forEach(x => x.classList.toggle('on', x === b));
+    }));
+  }
+
+  async function quizStart(userText, opts, lang) {
     if (state.processing) return;
+    const voice = typeof opts.voice === 'boolean' ? opts.voice : quizVoiceDefault();
     if (userText) addMessage('user', userText);
+    if (quiz && quiz.card) quiz.card.remove(); // one quiz on screen
+    if (quizSetupCard) { quizSetupCard.remove(); quizSetupCard = null; }
+    const wait = utilCard(null, 'KVIZ', `<div class="util-done">Pripremam ${opts.count} pitanja${opts.topic ? ' · ' + escapeHtml(opts.topic) : ''}…</div>`, [], '🎯');
+    wait.classList.add('card-quiz');
     state.processing = true; setState('thinking'); updateMic();
     let qs = [], err = null;
     try {
@@ -6642,16 +6753,20 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       qs = parseQuizJson(await askModelOnce(QUIZ_SYSTEM, ask)).slice(0, opts.count);
     } catch (e) { err = e; }
     state.processing = false; setState('idle'); updateMic();
-    if (!qs.length) { await localReply(userText, err ? 'Kviz se nije mogao pripremiti: ' + err.message : 'Nisam uspio sastaviti pitanja, pokušaj ponovno.', lang, true); return; }
-    quiz = { qs, i: 0, score: 0, topic: opts.topic, card: null, lang };
+    if (!qs.length) {
+      wait.remove();
+      const msg = err ? 'Kviz se nije mogao pripremiti: ' + err.message : 'Nisam uspio sastaviti pitanja, pokušaj ponovno.';
+      addMessage(err ? 'error' : 'assistant', msg);
+      if (voice) await speak(msg, lang); else resumeWakeWordIfEnabled();
+      return;
+    }
+    quiz = { qs, i: 0, score: 0, wrong: 0, skipped: 0, topic: opts.topic, voice, card: wait, lang, last: null, final: '', finished: false, done: 0 };
     try { localStorage.setItem('jarvis_quiz_seen', JSON.stringify([...quizSeen(), ...qs.map(q => q.q.slice(0, 90))].slice(-60))); } catch {}
-    renderQuizCard('');
-    const intro = `Kviz${opts.topic ? ` na temu ${opts.topic}` : ''}, ${qs.length} pitanja. Odgovaraj slovom A, B, C ili D, ili reci odgovor. `;
-    await localReply(userText, intro + quizQuestionSpoken(qs[0], 0, qs.length), lang, true);
-    quizListen();
-  }
-  function quizListen() { // the game is spoken: open the mic for the answer
-    setTimeout(() => { if (quiz && quiz.i < quiz.qs.length && !state.recognizing && !state.processing && !state.speaking) { try { startListening(); } catch {} } }, 300);
+    renderQuiz();
+    if (voice) {
+      await quizSay(`Kviz${opts.topic ? ` na temu ${opts.topic}` : ''}, ${qs.length} pitanja. Odgovaraj slovom A, B, C ili D, ili reci odgovor. ` + quizQuestionSpoken(qs[0], 0, qs.length));
+      quizListen();
+    } else resumeWakeWordIfEnabled();
   }
   // A spoken answer: letter ("a", "be", "ce", "de", "pod b", "odgovor c"), ordinal, or the answer text.
   function quizParseAnswer(t) {
@@ -6670,35 +6785,38 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     if (hit.length === 1) return { k: hit[0].k };
     return null;
   }
-  async function quizAnswer(userText, k, lang) {
+  async function quizAnswer(k) {
     if (!quiz || quiz.i >= quiz.qs.length || state.processing) return;
-    if (state.speaking) { // a tapped answer cuts the question short
-      interruptSpeech();
-      for (let w = 0; state.speaking && w < 20; w++) await new Promise(r => setTimeout(r, 50));
-    }
-    const q = quiz.qs[quiz.i], right = `${QUIZ_LETTERS[q.c]}: ${q.a[q.c]}`;
-    let line;
-    if (k === q.c) { quiz.score++; line = `Točno! ${q.e}`.trim(); }
-    else if (k < 0) line = `Preskočeno. Točan odgovor je ${right}.`;
-    else line = `Netočno. Točan odgovor je ${right}. ${q.e}`.trim();
+    await quizStopSpeaking(); // a tapped answer cuts the question short
+    if (!quiz || quiz.i >= quiz.qs.length) return;
+    const q = quiz.qs[quiz.i], right = `${QUIZ_LETTERS[q.c]}: ${q.a[q.c].replace(/\.+$/, '')}`;
+    let spoken;
+    if (k === q.c) { quiz.score++; quiz.last = { ok: true, text: `✓ Točno! ${q.e}`.trim() }; spoken = `Točno! ${q.e}`; }
+    else if (k < 0) { quiz.skipped++; quiz.last = { ok: false, text: `↷ Preskočeno — točno je ${right}. ${q.e}`.trim() }; spoken = `Preskočeno. Točan odgovor je ${right}.`; }
+    else { quiz.wrong++; quiz.last = { ok: false, text: `✗ Netočno — točno je ${right}. ${q.e}`.trim() }; spoken = `Netočno. Točan odgovor je ${right}. ${q.e}`; }
     quiz.i++;
-    if (quiz.i >= quiz.qs.length) { await quizEnd(userText, lang, line); return; }
-    renderQuizCard(line);
-    await localReply(userText, `${line} ${quizQuestionSpoken(quiz.qs[quiz.i], quiz.i, quiz.qs.length)}`, lang);
-    quizListen();
+    if (quiz.i >= quiz.qs.length) { await quizEnd(spoken.trim()); return; }
+    renderQuiz();
+    if (quiz.voice) { await quizSay(`${spoken.trim()} ${quizQuestionSpoken(quiz.qs[quiz.i], quiz.i, quiz.qs.length)}`); quizListen(); }
+    else quizIdle();
   }
-  async function quizEnd(userText, lang, lastLine) {
-    if (!quiz) return;
+  async function quizEnd(lastSpoken) {
+    if (!quiz || quiz.finished) return;
+    await quizStopSpeaking();
     const n = quiz.qs.length, done = Math.min(quiz.i, n), s = quiz.score;
-    quiz.i = n; quiz.done = done;
-    const best = Math.max(s, parseInt(localStorage.getItem('jarvis_quiz_best') || '0', 10) || 0);
-    try { localStorage.setItem('jarvis_quiz_best', String(best)); } catch {}
+    const record = s > quizBest();
+    if (record) { try { localStorage.setItem('jarvis_quiz_best', String(s)); } catch {} }
+    Object.assign(quiz, { i: n, done, finished: true });
     const ratio = done ? s / done : 0;
-    const verdict = ratio === 1 && done ? 'Savršeno — impresivno.' : ratio >= 0.7 ? 'Odličan rezultat.' : ratio >= 0.4 ? 'Solidno, ima prostora za revanš.' : 'Pitanja su ovaj put pobijedila. Revanš?';
-    renderQuizCard((lastLine ? lastLine + ' ' : '') + `Rezultat: ${s} od ${done}. Najbolji dosad: ${best}.`);
-    const msg = `${lastLine ? lastLine + ' ' : ''}Kraj kviza! Rezultat: ${s} od ${done}. ${verdict}`;
-    quiz = Object.assign(quiz, { finished: true });
-    await localReply(userText, msg, lang);
+    const verdict = !done ? 'Bez odgovora — revanš drugi put.' : ratio === 1 ? 'Savršeno — impresivno.' : ratio >= 0.7 ? 'Odličan rezultat.' : ratio >= 0.4 ? 'Solidno, ima prostora za revanš.' : 'Pitanja su ovaj put pobijedila. Revanš?';
+    quiz.final = `${verdict}${record ? ' Novi rekord!' : ''}`;
+    renderQuiz();
+    // The conversation only remembers the result, so "kako sam prošao u kvizu" works.
+    state.history.push({ role: 'user', content: '(kviz)' });
+    state.history.push({ role: 'assistant', content: `Kviz${quiz.topic ? ' (' + quiz.topic + ')' : ''}: ${s} od ${done} točno.` });
+    persistHistory();
+    if (quiz.voice) await quizSay(`${lastSpoken ? lastSpoken + ' ' : ''}Kraj kviza! Rezultat: ${s} od ${done}. ${verdict}${record ? ' Novi rekord!' : ''}`);
+    else quizIdle();
   }
 
   async function localReply(userText, reply, lang, skipUserBubble) {
@@ -6727,9 +6845,9 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const modeIntent = matchModeIntent(t);
     if (modeIntent) { voiceSetMode(t, modeIntent, lang); return; }
     const quizAns = quizParseAnswer(t);
-    if (quizAns) { quizAns.end ? quizEnd(t, lang) : quizAnswer(t, quizAns.k, lang); return; }
-    const quizStart = matchQuizStart(t);
-    if (quizStart) { voiceQuizStart(t, quizStart, lang); return; }
+    if (quizAns) { quizAns.end ? quizEnd() : quizAnswer(quizAns.k); return; }
+    const quizReq = matchQuizStart(t);
+    if (quizReq) { quizStart(t, quizReq, lang); return; }
     const courtOnce = matchCourtOnce(t);
     if (courtOnce) { voiceCourtTranslate(t, courtOnce, lang); return; }
     if (state.mode === 'dvor') { voiceCourtTranslate(t, t, lang); return; }
@@ -7379,7 +7497,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         case 'start_quiz': {
           const count = Math.min(15, Math.max(3, parseInt(toolUse.input.count, 10) || 5));
           const topic = String(toolUse.input.topic || '').trim();
-          pendingAfterReply = () => voiceQuizStart(null, { count, topic }, currentLang());
+          pendingAfterReply = () => quizStart(null, { count, topic }, currentLang());
           return `Quiz will start right after your reply (${count} questions${topic ? ', topic ' + topic : ''}). Just say one short sentence like "Krećemo!" — do not ask any questions yourself.`;
         }
         case 'save_idea': {
@@ -8168,6 +8286,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
 
     $('personalitySlider').value = state.personality;
     $('modeSelect').value = MODES[state.mode] ? state.mode : 'normal';
+    $('quizVoiceToggle').checked = quizVoiceDefault();
     $('bootSequenceToggle').checked = state.bootSequenceEnabled;
     $('continuousConvToggle').checked = state.continuousConversation;
     $('memoryRetentionSelect').value = String(state.memoryRetentionDays);
@@ -8237,6 +8356,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
 
     state.personality = parseInt($('personalitySlider').value, 10);
     if ($('modeSelect').value !== state.mode) setMode($('modeSelect').value);
+    setQuizVoiceDefault($('quizVoiceToggle').checked);
     state.continuousConversation = $('continuousConvToggle').checked;
     state.memoryRetentionDays = parseInt($('memoryRetentionSelect').value, 10);
     readRezijeInputs();
@@ -8343,7 +8463,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
-      'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme', 'jarvis_mode', 'jarvis_quiz_best', 'jarvis_quiz_seen',
+      'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme', 'jarvis_mode', 'jarvis_quiz_best', 'jarvis_quiz_seen', 'jarvis_quiz_voice',
       'jarvis_openai_key', 'jarvis_openai_model', 'jarvis_provider_enabled', 'jarvis_wa_country',
       'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_last_notice_date',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
@@ -8452,6 +8572,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       handleCameraRequest('', lang, { mode: 'scene' });
     });
   })();
+  $('quizBtn').addEventListener('click', () => showQuizSetup());
   $('exportBtn').addEventListener('click', () => {
     const { count } = showExportCard();
     if (count) shareConversation();
