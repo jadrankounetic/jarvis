@@ -309,6 +309,13 @@
     animation: pulse-dot 2s ease-in-out infinite;
   }
 
+  .mode-badge { animation: none; color: var(--cyan-bright); border-color: var(--cyan); letter-spacing: 0.08em; }
+  /* Quiz card */
+  .quiz-q { color: var(--cyan-bright); font-size: 13px; line-height: 1.4; padding: 2px 0 4px; }
+  .quiz-opt { color: var(--text); font-size: 12px; padding: 2px 0; }
+  .quiz-opt b { color: var(--gold); display: inline-block; width: 18px; }
+  .util-actions button.quiz-btn { flex: 1 1 18%; font-size: 12px; }
+
   /* Reminders list (Settings) */
   .reminders-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
   .reminder-item {
@@ -764,6 +771,7 @@
       <div class="brand-dot"></div>
       <span>J.A.R.V.I.S.</span>
       <span class="wake-badge" id="wakeBadge" style="display:none;">👂 WAKE</span>
+      <span class="wake-badge mode-badge" id="modeBadge" style="display:none;"></span>
       <span class="cloud-dot" id="cloudDot" hidden aria-label="Oblak">☁</span>
     </div>
     <div class="topbar-right">
@@ -1079,7 +1087,7 @@
       </select>
     </div>
     <div class="info-note">
-      Glasom možeš mijenjati: temu ("promijeni temu u crvenu"), ton ("budi sarkastičan"), Claude model ("koristi Opus"), brzinu razmišljanja ("razmišljaj temeljito"), providera ("koristi samo Gemini", "isključi Gemini", "uključi ChatGPT"), auto-routing, wake word, kontinuirani razgovor, animaciju paljenja, jutarnji brifing i glas ("promijeni glas na Daniel"). API ključevi, brisanja i veze s bazama mijenjaju se samo ovdje.
+      Glasom možeš mijenjati: temu ("promijeni temu u crvenu"), ton ("budi sarkastičan"), način rada ("budi sarkastični butler", "način detektiv", "dvorski način", "normalni način"), Claude model ("koristi Opus"), brzinu razmišljanja ("razmišljaj temeljito"), providera ("koristi samo Gemini", "isključi Gemini", "uključi ChatGPT"), auto-routing, wake word, kontinuirani razgovor, animaciju paljenja, jutarnji brifing i glas ("promijeni glas na Daniel"). API ključevi, brisanja i veze s bazama mijenjaju se samo ovdje.
     </div>
 
     <h3>Personality</h3>
@@ -1089,6 +1097,15 @@
       <div class="slider-labels">
         <span>Profesionalan</span><span>Balansiran</span><span>Sarkastičan</span>
       </div>
+    </div>
+    <div class="field">
+      <label>Način rada (zabava)</label>
+      <select id="modeSelect">
+        <option value="normal">Normalni</option>
+        <option value="butler">🎩 Sarkastični butler — komentira svaku tvoju odluku</option>
+        <option value="detektiv">🕵 Detektiv — "analiziraj moj dan" kao slučaj</option>
+        <option value="dvor">👑 Dvorski engleski — prevodi sve što kažeš</option>
+      </select>
     </div>
 
     <h3>Memory</h3>
@@ -1363,7 +1380,7 @@
   // ==================================================================
   // CONFIG
   // ==================================================================
-  const JARVIS_VERSION = '10.6';
+  const JARVIS_VERSION = '10.7';
   const ANTHROPIC_VERSION = '2023-06-01';
   const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -1445,6 +1462,7 @@ For all other tools: call directly, then briefly summarize the result in speech.
       : '';
     return SYSTEM_PROMPT_BASE
       + `\n\n${personalityLine}`
+      + (modePrompt() ? `\n\n${modePrompt()}` : '')
       + memoryBlock
       + `\n\nCurrent date and time (use this to resolve relative expressions like "in 20 minutes" or "tomorrow at 3pm"): ${new Date().toString()}`;
   }
@@ -1733,11 +1751,22 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
       input_schema: {
         type: 'object',
         properties: {
-          setting: { type: 'string', enum: ['theme', 'tone', 'claude_model', 'thinking', 'provider', 'provider_enabled', 'auto_routing', 'wake_word', 'continuous', 'boot_animation', 'morning_briefing', 'voice'],
-            description: 'theme: plava|zlatna|crvena|zelena. tone: profesionalan|balansiran|sarkastičan. claude_model: opus|sonnet|haiku|fable. thinking: brzo|uravnoteženo|temeljito. provider (use only this one): claude|gemini|openai|openrouter. provider_enabled: "<provider> on" or "<provider> off" — switches a provider on/off without deleting its key. auto_routing, wake_word, continuous, boot_animation, morning_briefing: on|off. voice: george|daniel|callum|jessica|adam.' },
+          setting: { type: 'string', enum: ['theme', 'tone', 'claude_model', 'thinking', 'provider', 'provider_enabled', 'auto_routing', 'wake_word', 'continuous', 'boot_animation', 'morning_briefing', 'voice', 'mode'],
+            description: 'theme: plava|zlatna|crvena|zelena. tone: profesionalan|balansiran|sarkastičan. claude_model: opus|sonnet|haiku|fable. thinking: brzo|uravnoteženo|temeljito. provider (use only this one): claude|gemini|openai|openrouter. provider_enabled: "<provider> on" or "<provider> off" — switches a provider on/off without deleting its key. auto_routing, wake_word, continuous, boot_animation, morning_briefing: on|off. voice: george|daniel|callum|jessica|adam. mode (fun role on top of the tone): normal|butler (sarcastic butler)|detektiv|dvor (translates everything into courtly English).' },
           value: { type: 'string', description: 'New value, one of the options listed for the setting.' }
         },
         required: ['setting', 'value']
+      }
+    },
+    {
+      name: 'start_quiz',
+      description: 'Start a spoken multiple-choice quiz game against Jarvis (questions with A–D answers, score kept). Use when the user wants to play a quiz or test their knowledge for fun.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          topic: { type: 'string', description: 'Optional topic in Croatian, e.g. "povijest", "nogomet". Empty for general knowledge.' },
+          count: { type: 'integer', description: 'Number of questions, 3–15 (default 5).' }
+        }
       }
     },
     {
@@ -2689,6 +2718,8 @@ Reply in the same language the user used, or Croatian if unclear. No markdown, n
     googleTokenExpiry: 0,
     // Personality (0 = professional, 1 = balanced, 2 = sarcastic/Tony-style)
     personality: parseInt(localStorage.getItem('jarvis_personality') || '1', 10),
+    // Fun mode on top of the tone: normal | butler | detektiv | dvor (this device only)
+    mode: localStorage.getItem('jarvis_mode') || 'normal',
     // Boot sequence
     bootSequenceEnabled: localStorage.getItem('jarvis_boot_sequence') !== 'false',
     // Morning briefing
@@ -5445,6 +5476,11 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
         state.personality = p; persist('jarvis_personality', p);
         return { msg: ['Od sada sam strogo profesionalan.', 'Vraćam se na balansiran ton.', 'Sarkastični način uključen. Pokušat ću se suzdržati. Malo.'][p] };
       }
+      case 'mode': {
+        const m = /normal|obič|obic|isklj|off|nijedan|standard/.test(v) ? 'normal' : /butler|batler/.test(v) ? 'butler' : /detektiv|detective/.test(v) ? 'detektiv' : /dvor|court|kraljev/.test(v) ? 'dvor' : null;
+        if (!m) throw new Error('Načini rada su: normalni, sarkastični butler, detektiv i dvorski engleski.');
+        return { msg: setMode(m) };
+      }
       case 'claude_model': {
         const k = Object.keys(CLAUDE_MODELS).find(m => v.includes(m));
         if (!k) throw new Error('Claude modeli su Opus, Sonnet, Haiku i Fable.');
@@ -6446,6 +6482,225 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     const tab = /graf|chart/.test(rest) ? 'grafovi' : /cijen|price/.test(rest) ? 'cijene' : /unos|upis|entry|očitanj|ocitanj/.test(rest) ? 'unos' : /tablic|table/.test(rest) ? 'tablica' : null;
     return { action: 'open', tab };
   }
+  // ---------- Fun modes: sarcastic butler, detective, courtly English ----------
+  // A mode sits on top of the tone (Personality): it changes the role, not the facts.
+  const MODES = {
+    normal: { label: 'Normalni', badge: '' },
+    butler: { label: 'Sarkastični butler', badge: '🎩 BUTLER',
+      prompt: 'MODE — sarcastic butler: you are an impeccably polite English butler with a bone-dry wit (Jeeves / Alfred). Comment on EVERY decision, plan or choice the user mentions with one short, gently mocking remark — raised eyebrow, understatement, mock despair — never crude, never hurtful. Then help fully and correctly; the quip never replaces or weakens the help. One quip per reply. No mockery about health, grief, safety or money worries — there you are simply kind.' },
+    detektiv: { label: 'Detektiv', badge: '🕵 DETEKTIV',
+      prompt: 'MODE — detective: speak like a hard-boiled noir detective narrating a case (slučaj, tragovi, osumnjičeni, zaključak), dry and atmospheric but brief. When asked about the user\'s day, treat it as a case: use only the facts given or fetched with your tools (calendar, reminders, shopping list, expenses, notes) and report a short case file — Slučaj, Tragovi, Osumnjičeni, Zaključak — in 4–7 spoken sentences. Never invent facts: where evidence is missing, say the trail went cold. Ordinary questions get a correct answer with a touch of noir.' },
+    dvor: { label: 'Dvorski engleski', badge: '👑 DVOR' }, // a translator: handled locally, see voiceCourtTranslate
+  };
+  const COURT_SYSTEM = 'You translate the user\'s sentence (usually Croatian) into ornate, formal English of a royal court — as if spoken by a courtier to the Crown: "Your Majesty", "pray", "I humbly beseech", "henceforth", "most gracious". Keep the original meaning; make it grand and playful, one to three sentences. Reply with the English translation only — no quotes, no notes, no Croatian.';
+  function modePrompt() { const m = MODES[state.mode]; return m && m.prompt ? m.prompt : ''; }
+  function refreshModeBadge() {
+    const b = $('modeBadge'); if (!b) return;
+    const m = MODES[state.mode] || MODES.normal;
+    b.textContent = m.badge; b.style.display = m.badge ? '' : 'none';
+    b.title = m.label;
+  }
+  function setMode(mode) {
+    if (!MODES[mode]) mode = 'normal';
+    state.mode = mode;
+    try { localStorage.setItem('jarvis_mode', mode); } catch {}
+    refreshModeBadge();
+    return {
+      normal: 'Vraćam se na normalni način rada.',
+      butler: 'Način sarkastični butler uključen. Vaše odluke, gospodine, od sada imaju svjedoka.',
+      detektiv: 'Način detektiv uključen. Grad spava, a ja imam pitanja. Reci "analiziraj moj dan" kad želiš izvještaj o slučaju.',
+      dvor: 'Dvorski način uključen. Sve što kažeš prevodim na svečani dvorski engleski. Za kraj reci: normalni način.',
+    }[mode];
+  }
+  function matchModeIntent(t) {
+    const x = normText(t).replace(/[.!?]+$/, '').trim();
+    if (/^(normaln\w*|obicn\w*|standardn\w*|uobicajen\w*) (nacin\w*|mod\w*|rezim\w*)( rada)?$/.test(x)
+      || /^(iskljuci|ugasi|prekini|zavrsi|izadi iz|makni) (nacin\w*|mod\w*|rezim\w*|butler\w*|batler\w*|detektiv\w*|dvorsk\w*)/.test(x)
+      || /^(dosta|kraj|stop) (dvorsk\w*|butler\w*|batler\w*|detektiv\w*|glume|uloge)/.test(x)) return 'normal';
+    const on = /\b(ukljuci|pokreni|aktiviraj|budi|prebaci|nacin|mod|rezim|postani|glumi|igraj)\b/.test(x) || /^(sarkasticni |sarkastican )?(butler|batler|detektiv|dvorski)\b/.test(x);
+    if (!on) return null;
+    if (/\b(butler\w*|batler\w*)\b/.test(x)) return 'butler';
+    if (/\bdetektiv\w*\b/.test(x)) return 'detektiv';
+    if (/\b(dvorsk\w*|kraljevsk\w* engleski)\b/.test(x)) return 'dvor';
+    return null;
+  }
+  async function voiceSetMode(userText, mode, lang) { await localReply(userText, setMode(mode), lang); }
+
+  // ---------- One question to a model, no tools, no history ----------
+  async function askModelOnce(system, userText) {
+    const primary = pickProvider(userText);
+    if (!primary) throw new Error('Nijedan AI model nije podešen. Upiši API ključ u Settings → Providers.');
+    let lastErr = null;
+    for (const p of fallbackChain(primary)) {
+      const model = getModel(p); if (!model) continue;
+      try {
+        const r = await ADAPTERS[p].call({ apiKey: state.keys[p], model, messages: [{ role: 'user', content: userText }], system });
+        const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        if (text) { state.lastProviderUsed = p; refreshStatusBar(); return text; }
+        lastErr = new Error('Model nije ništa odgovorio.');
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('Nijedan model nije odgovorio.');
+  }
+
+  // ---------- Courtly English ----------
+  async function voiceCourtTranslate(userText, sentence, lang) {
+    addMessage('user', userText);
+    state.processing = true; setState('thinking'); updateMic();
+    let out = null, err = null;
+    try { out = (await askModelOnce(COURT_SYSTEM, sentence)).replace(/^["“]|["”]$/g, ''); }
+    catch (e) { err = e; }
+    state.processing = false;
+    if (err) { addMessage('error', 'Prijevod nije uspio: ' + err.message); setState('idle'); updateMic(); resumeWakeWordIfEnabled(); return; }
+    addMessage('assistant', out, { provider: '👑' });
+    state.history.push({ role: 'user', content: userText }); state.history.push({ role: 'assistant', content: out }); persistHistory();
+    await speak(out, 'en-GB');
+  }
+  function matchCourtOnce(t) {
+    const m = /^(?:prevedi|reci|kazi|kaži|izgovori)\s+(?:mi\s+)?(?:to\s+)?(?:na\s+)?dvorsk\w*(?:\s+engleski)?(?:\s+stil)?\s*[:,-]?\s+(.+)$/i.exec(t.trim());
+    return m ? m[1].trim() : null;
+  }
+
+  // ---------- Detective: today's facts ----------
+  function dayFacts() {
+    const now = new Date(), y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    const isToday = ts => { const t = new Date(ts); return t.getFullYear() === y && t.getMonth() === mo && t.getDate() === d; };
+    const hm = ts => { const t = new Date(ts); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; };
+    const lines = [`Datum: ${utilHrFromDate(now)} (${['nedjelja', 'ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota'][now.getDay()]}), sada je ${hm(now)}.`];
+    const rem = loadReminders().filter(r => isToday(r.fireAt)).sort((a, b) => a.fireAt - b.fireAt);
+    lines.push(rem.length ? 'Podsjetnici danas: ' + rem.map(r => `${hm(r.fireAt)} ${r.message}${r.fireAt < Date.now() ? ' (prošao)' : ''}`).join('; ') + '.' : 'Podsjetnici danas: nema.');
+    const shop = loadList(SHOP);
+    const addedToday = shop.filter(i => i.addedAt && isToday(i.addedAt)).map(i => i.text);
+    const open = shop.filter(i => !i.done).map(i => i.text);
+    lines.push(`Popis za kupovinu: ${open.length ? 'još za kupiti ' + open.join(', ') : 'prazan'}${addedToday.length ? `; danas dodano: ${addedToday.join(', ')}` : ''}.`);
+    const exp = loadExpenses().filter(x => isToday(x.timestamp));
+    lines.push(exp.length ? 'Troškovi danas: ' + exp.map(x => `${x.amount} ${x.currency || '€'} (${x.category}${x.note ? ', ' + x.note : ''})`).join('; ') + '.' : 'Troškovi danas: nisu zabilježeni.');
+    const ideas = loadIdeas().filter(i => isToday(i.timestamp)).map(i => i.text);
+    if (ideas.length) lines.push('Nove ideje danas: ' + ideas.join('; ') + '.');
+    const soon = upcomingDates(7);
+    if (soon.length) lines.push('Važni datumi uskoro: ' + soon.map(x => `${x.entry.name} (${x.entry.type || 'datum'}) ${dateWhen(x)}`).join('; ') + '.');
+    if (activeRoute && routeIsActive()) lines.push(`Danas planirana ruta: do ${routePlaceText(activeRoute.dest)}.`);
+    return lines.join('\n');
+  }
+  function isDayAnalysisIntent(t) {
+    const x = normText(t).replace(/[.!?]+$/, '');
+    return /^(analiziraj|istrazi|razrijesi|rijesi|ispitaj)\s+(mi\s+)?(moj|danasnji|ovaj)\s+dan$|^(kako mi je (prosao|bio) dan|kakav mi je bio dan|slucaj dana|izvjestaj o (mom|mojem) danu|sto se danas dogodilo|analiza (mog|mojeg|danasnjeg) dana)$/.test(x);
+  }
+  function voiceDayAnalysis(userText, lang) {
+    const detective = state.mode === 'detektiv';
+    const task = detective
+      ? 'Analiziraj moj današnji dan kao detektivski slučaj (Slučaj, Tragovi, Osumnjičeni, Zaključak). Ako imaš alat za kalendar, prvo pogledaj današnje događaje. Koristi samo činjenice.'
+      : 'Napravi kratak, topao pregled mog današnjeg dana (3–5 rečenica). Ako imaš alat za kalendar, prvo pogledaj današnje događaje. Koristi samo činjenice.';
+    handleUserMessage(`${task}\n\n[Činjenice s uređaja]\n${dayFacts()}`, lang, { displayText: userText });
+  }
+
+  // ---------- Quiz against Jarvis ----------
+  let quiz = null; // { qs: [{ q, a: [4], c, e }], i, score, topic, card, lang, answered }
+  const QUIZ_SYSTEM = 'You write pub-quiz questions in Croatian. Reply with JSON only (no markdown): an array of objects {"q": question, "a": [four short answer options], "c": index 0-3 of the correct option, "e": one short sentence explaining the answer}. Facts must be correct and unambiguous; exactly one option is right; mix easy and medium difficulty; vary the position of the correct option.';
+  function quizSeen() { try { return JSON.parse(localStorage.getItem('jarvis_quiz_seen') || '[]'); } catch { return []; } }
+  function parseQuizJson(text) {
+    const m = String(text).replace(/```(?:json)?/gi, '').match(/\[[\s\S]*\]/);
+    if (!m) return [];
+    let arr; try { arr = JSON.parse(m[0]); } catch { return []; }
+    return (Array.isArray(arr) ? arr : []).filter(x => x && typeof x.q === 'string' && Array.isArray(x.a) && x.a.length === 4 && Number.isInteger(x.c) && x.c >= 0 && x.c < 4)
+      .map(x => ({ q: x.q.trim(), a: x.a.map(s => String(s).trim()), c: x.c, e: String(x.e || '').trim() }));
+  }
+  function matchQuizStart(t) {
+    const x = normText(t).replace(/[.!?]+$/, '');
+    if (!/\bkviz\w*\b/.test(x)) return null;
+    if (!/^(kviz|igra\w*|zaigra\w*|ajmo|hajmo|idemo|pokreni|zapocni|zelim|hocu|daj|napravi|moze|ajde|kreni|novi)\b/.test(x)) return null;
+    const n = /\b(\d{1,2})\s+pitanj/.exec(x);
+    const topic = /\bkviz\w*\s+(?:o|iz|na temu|o temi)\s+(.+?)(?:\s+(?:od|sa|s)\s+\d+\s+pitanj\w*)?$/.exec(x);
+    return { count: Math.min(15, Math.max(3, n ? parseInt(n[1], 10) : 5)), topic: topic ? topic[1].trim() : '' };
+  }
+  const QUIZ_LETTERS = ['A', 'B', 'C', 'D'];
+  function quizQuestionSpoken(q, i, n) { return `Pitanje ${i + 1} od ${n}. ${q.q} ${q.a.map((o, k) => `${QUIZ_LETTERS[k]}: ${o}.`).join(' ')}`; }
+  function renderQuizCard(lastLine) {
+    const n = quiz.qs.length;
+    let body = '';
+    if (lastLine) body += `<div class="util-done">${escapeHtml(lastLine)}</div>`;
+    if (quiz.i < n) {
+      const q = quiz.qs[quiz.i];
+      body += `<div class="quiz-q">${escapeHtml(q.q)}</div>` + q.a.map((o, k) => `<div class="quiz-opt"><b>${QUIZ_LETTERS[k]}</b> ${escapeHtml(o)}</div>`).join('');
+    }
+    const title = quiz.i < n ? `KVIZ · ${quiz.i + 1}/${n} · ${quiz.score} ${plural(quiz.score, 'bod', 'boda', 'bodova')}` : `KVIZ · REZULTAT ${quiz.score}/${quiz.done ?? n}`;
+    const buttons = quiz.i < n
+      ? [...QUIZ_LETTERS.map((L, k) => ({ label: L, cls: 'quiz-btn', onClick: () => quizAnswer(L, k, quiz.lang) })),
+        { label: 'Preskoči', onClick: () => quizAnswer('Preskoči', -1, quiz.lang) }, { label: 'Kraj', cls: 'util-cancel', onClick: () => quizEnd('Kraj', quiz.lang) }]
+      : [{ label: 'Nova igra', cls: 'util-save', onClick: () => voiceQuizStart('Nova igra kviza', { count: n, topic: quiz.topic }, quiz.lang) }];
+    quiz.card = utilCard(quiz.card, title, body, buttons, '🎯');
+    quiz.card.classList.add('card-quiz');
+  }
+  async function voiceQuizStart(userText, opts, lang) {
+    if (state.processing) return;
+    if (userText) addMessage('user', userText);
+    state.processing = true; setState('thinking'); updateMic();
+    let qs = [], err = null;
+    try {
+      const seen = quizSeen().slice(-25);
+      const ask = `Napravi ${opts.count} pitanja${opts.topic ? ` na temu: ${opts.topic}` : ' iz opće kulture (miješane teme: povijest, zemljopis, znanost, sport, film, glazba, Hrvatska)'}.` + (seen.length ? `\nNe ponavljaj ova pitanja:\n- ${seen.join('\n- ')}` : '');
+      qs = parseQuizJson(await askModelOnce(QUIZ_SYSTEM, ask)).slice(0, opts.count);
+    } catch (e) { err = e; }
+    state.processing = false; setState('idle'); updateMic();
+    if (!qs.length) { await localReply(userText, err ? 'Kviz se nije mogao pripremiti: ' + err.message : 'Nisam uspio sastaviti pitanja, pokušaj ponovno.', lang, true); return; }
+    quiz = { qs, i: 0, score: 0, topic: opts.topic, card: null, lang };
+    try { localStorage.setItem('jarvis_quiz_seen', JSON.stringify([...quizSeen(), ...qs.map(q => q.q.slice(0, 90))].slice(-60))); } catch {}
+    renderQuizCard('');
+    const intro = `Kviz${opts.topic ? ` na temu ${opts.topic}` : ''}, ${qs.length} pitanja. Odgovaraj slovom A, B, C ili D, ili reci odgovor. `;
+    await localReply(userText, intro + quizQuestionSpoken(qs[0], 0, qs.length), lang, true);
+    quizListen();
+  }
+  function quizListen() { // the game is spoken: open the mic for the answer
+    setTimeout(() => { if (quiz && quiz.i < quiz.qs.length && !state.recognizing && !state.processing && !state.speaking) { try { startListening(); } catch {} } }, 300);
+  }
+  // A spoken answer: letter ("a", "be", "ce", "de", "pod b", "odgovor c"), ordinal, or the answer text.
+  function quizParseAnswer(t) {
+    if (!quiz || quiz.i >= quiz.qs.length) return null;
+    const x = normText(t).replace(/[.!?,]+$/, '').trim();
+    if (/^(kraj|dosta|stop|prekini|zavrsi|kraj kviza|prekini kviz|zavrsi kviz|dosta kviza)( kviz\w*)?$/.test(x)) return { end: true };
+    if (/^(ne znam|preskoci|preskoci pitanje|dalje|sljedece|nemam pojma|pas)$/.test(x)) return { k: -1 };
+    const L = /^(?:odgovor\s+|pod\s+|slovo\s+|mislim\s+(?:da je\s+)?|moj odgovor je\s+)?(a|be|b|ce|c|de|d|bi|si|di|ej|ei)$/.exec(x);
+    if (L) return { k: { a: 0, ej: 0, ei: 0, b: 1, be: 1, bi: 1, c: 2, ce: 2, si: 2, d: 3, de: 3, di: 3 }[L[1]] };
+    const ord = /^(prvi|prva|prvo|drugi|druga|drugo|treci|treca|trece|cetvrti|cetvrta|cetvrto)( odgovor)?$/.exec(x);
+    if (ord) return { k: ['prv', 'drug', 'trec', 'cetvrt'].findIndex(s => ord[1].startsWith(s)) };
+    const opts = quiz.qs[quiz.i].a.map(o => normText(o));
+    const exact = opts.findIndex(o => o === x);
+    if (exact >= 0) return { k: exact };
+    const hit = opts.map((o, k) => ({ o, k })).filter(({ o }) => o.length >= 3 && (x.includes(o) || (x.length >= 4 && o.includes(x))));
+    if (hit.length === 1) return { k: hit[0].k };
+    return null;
+  }
+  async function quizAnswer(userText, k, lang) {
+    if (!quiz || quiz.i >= quiz.qs.length || state.processing) return;
+    if (state.speaking) { // a tapped answer cuts the question short
+      interruptSpeech();
+      for (let w = 0; state.speaking && w < 20; w++) await new Promise(r => setTimeout(r, 50));
+    }
+    const q = quiz.qs[quiz.i], right = `${QUIZ_LETTERS[q.c]}: ${q.a[q.c]}`;
+    let line;
+    if (k === q.c) { quiz.score++; line = `Točno! ${q.e}`.trim(); }
+    else if (k < 0) line = `Preskočeno. Točan odgovor je ${right}.`;
+    else line = `Netočno. Točan odgovor je ${right}. ${q.e}`.trim();
+    quiz.i++;
+    if (quiz.i >= quiz.qs.length) { await quizEnd(userText, lang, line); return; }
+    renderQuizCard(line);
+    await localReply(userText, `${line} ${quizQuestionSpoken(quiz.qs[quiz.i], quiz.i, quiz.qs.length)}`, lang);
+    quizListen();
+  }
+  async function quizEnd(userText, lang, lastLine) {
+    if (!quiz) return;
+    const n = quiz.qs.length, done = Math.min(quiz.i, n), s = quiz.score;
+    quiz.i = n; quiz.done = done;
+    const best = Math.max(s, parseInt(localStorage.getItem('jarvis_quiz_best') || '0', 10) || 0);
+    try { localStorage.setItem('jarvis_quiz_best', String(best)); } catch {}
+    const ratio = done ? s / done : 0;
+    const verdict = ratio === 1 && done ? 'Savršeno — impresivno.' : ratio >= 0.7 ? 'Odličan rezultat.' : ratio >= 0.4 ? 'Solidno, ima prostora za revanš.' : 'Pitanja su ovaj put pobijedila. Revanš?';
+    renderQuizCard((lastLine ? lastLine + ' ' : '') + `Rezultat: ${s} od ${done}. Najbolji dosad: ${best}.`);
+    const msg = `${lastLine ? lastLine + ' ' : ''}Kraj kviza! Rezultat: ${s} od ${done}. ${verdict}`;
+    quiz = Object.assign(quiz, { finished: true });
+    await localReply(userText, msg, lang);
+  }
+
   async function localReply(userText, reply, lang, skipUserBubble) {
     if (userText && !skipUserBubble) addMessage('user', userText);
     addMessage('assistant', reply);
@@ -6468,6 +6723,17 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       if (/^(odustani|ne|ništa|nista|cancel)[.!]?$/i.test(t)) { localReply(t, 'U redu, ništa nisam zapisao.', lang); return; }
       voiceSaveIdea(t, t, lang); return;
     }
+    // Fun modes and the quiz come before everything else: "budi sarkastični butler" is a mode, not the tone.
+    const modeIntent = matchModeIntent(t);
+    if (modeIntent) { voiceSetMode(t, modeIntent, lang); return; }
+    const quizAns = quizParseAnswer(t);
+    if (quizAns) { quizAns.end ? quizEnd(t, lang) : quizAnswer(t, quizAns.k, lang); return; }
+    const quizStart = matchQuizStart(t);
+    if (quizStart) { voiceQuizStart(t, quizStart, lang); return; }
+    const courtOnce = matchCourtOnce(t);
+    if (courtOnce) { voiceCourtTranslate(t, courtOnce, lang); return; }
+    if (state.mode === 'dvor') { voiceCourtTranslate(t, t, lang); return; }
+    if (isDayAnalysisIntent(t)) { voiceDayAnalysis(t, lang); return; }
     const idea = matchIdeaIntent(t);
     if (idea) { idea.text ? voiceSaveIdea(t, idea.text, lang) : voiceAskForIdea(t, lang); return; }
     if (isReadIdeasIntent(t)) { voiceReadIdeas(t, lang); return; }
@@ -7109,6 +7375,12 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
             if (r.after) pendingAfterReply = r.after;
             return 'Done: ' + r.msg;
           } catch (e) { return 'NOT changed: ' + e.message; }
+        }
+        case 'start_quiz': {
+          const count = Math.min(15, Math.max(3, parseInt(toolUse.input.count, 10) || 5));
+          const topic = String(toolUse.input.topic || '').trim();
+          pendingAfterReply = () => voiceQuizStart(null, { count, topic }, currentLang());
+          return `Quiz will start right after your reply (${count} questions${topic ? ', topic ' + topic : ''}). Just say one short sentence like "Krećemo!" — do not ask any questions yourself.`;
         }
         case 'save_idea': {
           const idea = addIdea(toolUse.input.text);
@@ -7895,6 +8167,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     $('tavilyKey').value = state.tavilyKey;
 
     $('personalitySlider').value = state.personality;
+    $('modeSelect').value = MODES[state.mode] ? state.mode : 'normal';
     $('bootSequenceToggle').checked = state.bootSequenceEnabled;
     $('continuousConvToggle').checked = state.continuousConversation;
     $('memoryRetentionSelect').value = String(state.memoryRetentionDays);
@@ -7963,6 +8236,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
     state.tavilyKey = $('tavilyKey').value.trim();
 
     state.personality = parseInt($('personalitySlider').value, 10);
+    if ($('modeSelect').value !== state.mode) setMode($('modeSelect').value);
     state.continuousConversation = $('continuousConvToggle').checked;
     state.memoryRetentionDays = parseInt($('memoryRetentionSelect').value, 10);
     readRezijeInputs();
@@ -8069,7 +8343,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
       'jarvis_last_briefing_date', 'jarvis_protocols',
       'jarvis_continuous_conv', 'jarvis_memories', 'jarvis_memory_retention',
       'jarvis_contacts', 'jarvis_expenses', 'jarvis_usage_stats',
-      'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme',
+      'jarvis_anthropic_effort', 'jarvis_ideas', 'jarvis_theme', 'jarvis_mode', 'jarvis_quiz_best', 'jarvis_quiz_seen',
       'jarvis_openai_key', 'jarvis_openai_model', 'jarvis_provider_enabled', 'jarvis_wa_country',
       'jarvis_shopping', 'jarvis_warranties', 'jarvis_dates', 'jarvis_last_notice_date',
       'jarvis_rezije_url', 'jarvis_rezije_node', 'jarvis_rezije_auth', 'jarvis_rezije_app_url', 'jarvis_rezije_title',
@@ -8357,6 +8631,7 @@ Rules: warranty_months only if a warranty / jamstvo period is printed (convert y
   // wake-word listening if it was left enabled.
   initReminders();
   pruneExpiredMemories();
+  refreshModeBadge();
   if (state.wakeWordEnabled) setTimeout(syncWakeWordListening, 500);
 
   cloudInit();
